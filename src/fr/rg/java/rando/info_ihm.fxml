@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.Pane?>
+
+<BorderPane xmlns="http://javafx.com/javafx/8.0.65" xmlns:fx="http://javafx.com/fxml/1" fx:controller="fr.rg.java.rando.InfoControler">
+	<center>
+		<Pane fx:id="graph" prefHeight="600.0" prefWidth="800.0" />
+	</center>
+	<bottom>
+		<ProgressBar fx:id="progressBar" prefWidth="800.0" progress="0.0" BorderPane.alignment="CENTER" />
+	</bottom>
+	<padding>
+		<Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+	</padding>
+</BorderPane>
