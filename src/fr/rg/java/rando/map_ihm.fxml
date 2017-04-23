@@ -26,7 +26,7 @@
 									control="UP" meta="UP" shift="UP" shortcut="UP" />
 							</accelerator>
 						</MenuItem>
-						<MenuItem mnemonicParsing="false" onAction="#newAddress"
+						<MenuItem mnemonicParsing="false" onAction="#saisirAdresse"
 							text="Adresse...">
 							<accelerator>
 								<KeyCodeCombination alt="ANY" code="A"

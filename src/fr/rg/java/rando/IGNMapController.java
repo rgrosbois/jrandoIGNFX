@@ -3,7 +3,10 @@ package fr.rg.java.rando;
 import java.awt.Point;
 import java.io.File;
 import java.io.IOException;
+import java.net.DatagramPacket;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
+import java.net.MulticastSocket;
 import java.net.URL;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
@@ -51,7 +54,7 @@ public class IGNMapController {
 	static final double DEFAULT_LATITUDE = 45.145f;
 	static final double DEFAULT_LONGITUDE = 5.72f;
 	static final int TILE_PIXEL_DIM = 256;
-	static String cleIGN = "ry9bshqmzmv1gao9srw610oq"; // -> 19/11/2017
+	static String cleIGN = ""; // -> 19/11/2017
 
 	// Zone où s'affiche à la fois la carte et les traces
 	@FXML
@@ -86,6 +89,7 @@ public class IGNMapController {
 
 		// Centrer la carte autour de cette position
 		loadIGNMap(lastGeoLoc);
+
 	}
 
 	/**
