@@ -90,6 +90,40 @@ public class IGNMapController {
 		// Centrer la carte autour de cette position
 		loadIGNMap(lastGeoLoc);
 
+		// Signaler périodiquement la présence de l'application sur le réseau
+		Thread t = new Thread(new Runnable() {
+
+			@Override
+			public void run() {
+				MulticastSocket s = null;
+				String msg = "Coucou c'est Java";
+				byte[] buf = msg.getBytes();
+				DatagramPacket pkt = null;
+				try {
+					pkt = new DatagramPacket(buf, buf.length, InetAddress.getByName("224.0.71.75"), 7175);
+					s = new MulticastSocket();
+					s.setLoopbackMode(true); // Ne pas envoyer sur l'interface
+												// lo
+				} catch (IOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+
+				while (true) {
+					try {
+						System.out.println("Hello");
+						if (s != null && pkt != null) {
+							s.send(pkt);
+						}
+
+						Thread.sleep(5000);
+					} catch (InterruptedException | IOException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		});
+		t.start();
 	}
 
 	/**
