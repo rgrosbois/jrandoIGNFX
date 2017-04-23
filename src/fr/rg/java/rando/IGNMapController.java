@@ -11,6 +11,7 @@ import java.net.URL;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -86,10 +87,11 @@ public class IGNMapController {
 	boolean ortho = false;
 
 	// Communauté réseau
-	String multicastAddress = "224.0.71.75";
-	int multicastPort = 7175;
-	long helloInterval = 5000;
+	static final String MULTICAST_ADDRESS = "224.0.71.75";
+	static final int MULTICAST_PORT = 7175;
+	static final long HELLO_INTERVAL = 5000;
 	ObservableList<String> peerList = FXCollections.observableArrayList();
+	ObservableList<Long> peerTimeStamp = FXCollections.observableArrayList();
 
 	Stage mainStage;
 
@@ -107,10 +109,10 @@ public class IGNMapController {
 		// Centrer la carte autour de cette position
 		loadIGNMap(lastGeoLoc);
 
-		gestionCommunaute();
+		handlePeers();
 	}
 
-	private void gestionCommunaute() {
+	private void handlePeers() {
 		// Signaler périodiquement la présence de l'application sur le réseau
 		Thread t = new Thread(new Runnable() {
 
@@ -121,11 +123,10 @@ public class IGNMapController {
 				byte[] buf = msg.getBytes();
 				DatagramPacket pkt = null;
 				try {
-					pkt = new DatagramPacket(buf, buf.length, InetAddress.getByName(multicastAddress), multicastPort);
+					pkt = new DatagramPacket(buf, buf.length, InetAddress.getByName(MULTICAST_ADDRESS), MULTICAST_PORT);
 					s = new MulticastSocket();
 					s.setLoopbackMode(true); // Ne pas envoyer sur lo
 				} catch (IOException e1) {
-					// TODO Auto-generated catch block
 					e1.printStackTrace();
 				}
 
@@ -135,7 +136,20 @@ public class IGNMapController {
 							s.send(pkt);
 						}
 
-						Thread.sleep(helloInterval);
+						// Purger la liste des pairs
+						long now = System.currentTimeMillis();
+						Iterator<String> it = peerList.iterator();
+						Iterator<Long> it2 = peerTimeStamp.iterator();
+						while (it.hasNext()) {
+							String peer = it.next();
+							long time = it2.next();
+							if ((now - time) > 2 * HELLO_INTERVAL) {
+								it.remove();
+								it2.remove();
+							}
+						}
+
+						Thread.sleep(HELLO_INTERVAL);
 					} catch (InterruptedException | IOException e) {
 						e.printStackTrace();
 					}
@@ -154,18 +168,21 @@ public class IGNMapController {
 				DatagramPacket pkt = new DatagramPacket(buf, buf.length);
 
 				try {
-					s = new MulticastSocket(multicastPort); // écoute sur port
-															// 7175
-					InetAddress group = InetAddress.getByName(multicastAddress);
+					s = new MulticastSocket(MULTICAST_PORT); // écoute sur port
+																// 7175
+					InetAddress group = InetAddress.getByName(MULTICAST_ADDRESS);
 					s.joinGroup(group);
 
 					while (true) {
 						s.receive(pkt); // attente
-						System.currentTimeMillis();
 
-						System.out.println(pkt.getAddress() + ":" + pkt.getPort() + " = " + new String(pkt.getData()));
-						if(!peerList.contains(pkt.getAddress().toString())) {
-							peerList.add(pkt.getAddress().toString());
+						long time = System.currentTimeMillis();
+						if (!peerList.contains(pkt.getAddress().getHostAddress())) {
+							peerList.add(pkt.getAddress().getHostAddress());
+							peerTimeStamp.add(time);
+						} else {
+							int index = peerList.indexOf(pkt.getAddress().getHostAddress());
+							peerTimeStamp.set(index, time);
 						}
 					}
 					// s.leaveGroup(group);
@@ -228,7 +245,6 @@ public class IGNMapController {
 		Stage peerStage = new Stage();
 		peerStage.setScene(scene);
 		peerStage.setTitle("Liste de pairs");
-		peerStage.initModality(Modality.WINDOW_MODAL);
 		peerStage.initOwner(mainStage);
 		peerStage.show();
 	}
