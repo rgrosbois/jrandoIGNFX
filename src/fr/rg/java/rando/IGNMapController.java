@@ -1,5 +1,6 @@
 package fr.rg.java.rando;
 
+import java.awt.Point;
 import java.io.File;
 import java.io.IOException;
 import java.net.HttpURLConnection;
@@ -7,20 +8,32 @@ import java.net.URL;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
 
 import javax.imageio.ImageIO;
 
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
+import javafx.concurrent.WorkerStateEvent;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Point2D;
+import javafx.geometry.Side;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.CustomMenuItem;
+import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.PixelFormat;
@@ -38,31 +51,40 @@ public class IGNMapController {
 	static final double DEFAULT_LATITUDE = 45.145f;
 	static final double DEFAULT_LONGITUDE = 5.72f;
 	static final int TILE_PIXEL_DIM = 256;
-	static String cleIGN = "ldg97k7coed6xk53ji8hryvm"; // -> 10 mai 2016
+	static String cleIGN = "ry9bshqmzmv1gao9srw610oq"; // -> 19/11/2017
 
+	// Zone où s'affiche à la fois la carte et les traces
 	@FXML
 	Pane contentPane;
 
+	// Noeud contenant la carte
 	@FXML
 	ImageView mapView;
 
+	// Gère l'affichage de la carte
 	@FXML
 	ScrollPane scrollPane;
 
+	// Barre de progression pour les tâches longues
 	@FXML
 	ProgressBar progressBar;
 
 	int nTileX = 5;
 	int nTileY = 5;
 	int ignScale = 15;
-	Point2D orig;
+	Point2D mapWmtsOrig; // Coordonnées WMTS de l'origine de la carte
 	Stage infoStage;
 	boolean useCache = true;
 	boolean ortho = false;
 
+	/**
+	 * Initialisation du contrôleur après le chargement du fichier FXML.
+	 */
 	public void initialize() {
-		// Afficher la carte autour de la dernière position courante
+		// Géolocalisation par défaut
 		GeoLocation lastGeoLoc = new GeoLocation(DEFAULT_LONGITUDE, DEFAULT_LATITUDE);
+
+		// Centrer la carte autour de cette position
 		loadIGNMap(lastGeoLoc);
 	}
 
@@ -74,32 +96,30 @@ public class IGNMapController {
 	 *            Géolocalisation centrale
 	 */
 	void loadIGNMap(GeoLocation centerLoc) {
-		// Prévoir une nouvelle image
+		// Nouvelle image modifiable
 		WritableImage mapImg = new WritableImage(TILE_PIXEL_DIM * nTileX, TILE_PIXEL_DIM * nTileY);
 		mapView.setImage(mapImg);
 
 		// Identifier la tuile centrale et les tuiles limites
-		int tileRowCenter = WMTS.latToTileRow(centerLoc.latitude, ignScale);
-		int tileColCenter = WMTS.longToTileCol(centerLoc.longitude, ignScale);
-		int tileRowMin = tileRowCenter - nTileY / 2;
-		int tileRowMax = tileRowCenter + nTileY / 2;
-		int tileColMin = tileColCenter - nTileX / 2;
-		int tileColMax = tileColCenter + nTileX / 2;
+		Point tileCenter = WMTS.getTileIndex(centerLoc.longitude, centerLoc.latitude, ignScale);
+		int tileRowMin = tileCenter.y - nTileY / 2;
+		int tileRowMax = tileCenter.y + nTileY / 2;
+		int tileColMin = tileCenter.x - nTileX / 2;
+		int tileColMax = tileCenter.x + nTileX / 2;
+		mapWmtsOrig = new Point2D(tileColMin * WMTS.getTileDim(ignScale), tileRowMin * WMTS.getTileDim(ignScale));
 		TileLoadingService tls = new TileLoadingService();
 		progressBar.progressProperty().bind(tls.progressProperty());
 		tls.setBounds(tileColMin, tileColMax, tileRowMin, tileRowMax);
 		tls.start();
 
 		// Centrer la carte autour de la position courante
-		orig = new Point2D(tileColMin * WMTS.getTileDim(ignScale), tileRowMin * WMTS.getTileDim(ignScale));
 		double xmin = tileColMin * WMTS.getTileDim(ignScale);
 		double xmax = tileColMax * WMTS.getTileDim(ignScale);
-		double x = WMTS.longToWmtsX(centerLoc.longitude);
-		scrollPane.hvalueProperty().setValue((x - xmin) / (xmax - xmin));
 		double ymin = tileRowMin * WMTS.getTileDim(ignScale);
 		double ymax = tileRowMax * WMTS.getTileDim(ignScale);
-		double y = WMTS.latToWmtsY(centerLoc.latitude);
-		scrollPane.vvalueProperty().setValue((y - ymin) / (ymax - ymin));
+		Point2D p = WMTS.getWmtsDim(centerLoc.latitude, centerLoc.longitude);
+		scrollPane.hvalueProperty().setValue((p.getX() - xmin) / (xmax - xmin));
+		scrollPane.vvalueProperty().setValue((p.getY() - ymin) / (ymax - ymin));
 	}
 
 	@FXML
@@ -108,6 +128,100 @@ public class IGNMapController {
 		System.out.println("vValue=" + scrollPane.vvalueProperty().toString());
 	}
 
+	/**
+	 * Ouvrir une boîte de dialogue permettant de saisir l'adresse où recentrer
+	 * la carte. Utilisation d'une fonction d'autosuggestion lorsque plus de 3
+	 * caractères sont tapés sont la forme d'un menu contextuel.
+	 *
+	 * @param e
+	 */
+	@FXML
+	void saisirAdresse(ActionEvent e) {
+		ContextMenu listeSuggest = new ContextMenu();
+		listeSuggest.hide();
+
+		TextInputDialog dialog = new TextInputDialog();
+		dialog.setTitle("Adresse");
+		dialog.setHeaderText("Rechercher une adresse");
+		dialog.setContentText("adresse:");
+
+		// Autocomplétion
+		TextField tf = dialog.getEditor();
+		tf.textProperty().addListener(new ChangeListener<String>() {
+
+			@Override
+			public void changed(ObservableValue<? extends String> observable, String oldValue, String newValue) {
+				// uniquement si plus de 3 caractères et que la chaîne
+				// est tapée à la main (i.e. pas après un clic sur une
+				// suggestion)
+				if (Math.abs(newValue.length() - oldValue.length()) <= 1 && newValue.length() >= 3) {
+					// Configurer une recherche de 5 suggestions
+					AddressSuggestionService as = new AddressSuggestionService(newValue, 5);
+
+					// Remplir le menu contextuel avec les suggestions trouvées
+					as.setOnSucceeded((WorkerStateEvent event) -> {
+						// Récupérer la liste de géolocalisations
+						ArrayList<GeoLocation> loc = (ArrayList<GeoLocation>) event.getSource().getValue();
+
+						if (loc.size() > 0) { // Liste contenant au moins 1
+												// élément
+							// Remplir une liste d'item de menu cliquables
+							List<CustomMenuItem> menuItems = new LinkedList<>();
+							for (int i = 0; i < loc.size(); i++) {
+								String result = loc.get(i).address;
+								CustomMenuItem item = new CustomMenuItem(new Label(result), true);
+								menuItems.add(item);
+
+								// Si clic sur la suggestion, remplir le
+								// TextField et cacher le menu
+								item.setOnAction((ActionEvent e1) -> {
+									tf.setText(result);
+									listeSuggest.hide();
+								});
+							}
+
+							// Remplacer le contenu du menu avec celui
+							// de la nouvelle liste.
+							listeSuggest.getItems().clear();
+							listeSuggest.getItems().addAll(menuItems);
+
+							// Afficher le menu en dessous du TextField
+							listeSuggest.show(tf, Side.BOTTOM, 0, 0);
+						} else { // liste vide -> cacher le menu contextuel
+							listeSuggest.hide();
+						}
+					});
+					// lancer la recherche
+					as.start();
+				}
+			}
+		});
+
+		// Afficher la boîte de dialogue
+		Optional<String> result = dialog.showAndWait();
+
+		// Traiter l'éventuelle réponse
+		result.ifPresent(address -> {
+			// Lancer une nouvelle recherche d'adresse et utiliser la première
+			// réponse valide
+			AddressSuggestionService as = new AddressSuggestionService(address, 5);
+			as.setOnSucceeded((WorkerStateEvent event) -> {
+				ArrayList<GeoLocation> loc = (ArrayList<GeoLocation>) event.getSource().getValue();
+				if (loc.size() > 0) {
+					loadIGNMap(loc.get(0));
+				}
+			});
+			as.start();
+		});
+
+	}
+
+	/**
+	 * Lire une trace depuis un fichier KML et l'afficher en surimpression sur
+	 * la carte.
+	 *
+	 * @param e
+	 */
 	@FXML
 	void loadKMLTrack(ActionEvent e) {
 		// Sélectionner le fichier
@@ -128,14 +242,12 @@ public class IGNMapController {
 
 		// Créer et afficher la trace correspondante
 		Polyline trace = new Polyline();
-		double wmtsX, wmtsY, x, y;
+		Point2D p;
+		double dist2px = TILE_PIXEL_DIM / WMTS.getTileDim(ignScale);
 		for (GeoLocation loc : list) {
-			wmtsX = WMTS.longToWmtsX(loc.longitude) - orig.getX();
-			x = wmtsX / WMTS.getTileDim(ignScale) * TILE_PIXEL_DIM;
-			wmtsY = WMTS.latToWmtsY(loc.latitude) - orig.getY();
-			y = wmtsY / WMTS.getTileDim(ignScale) * TILE_PIXEL_DIM;
-			trace.getPoints().add(x);
-			trace.getPoints().add(y);
+			// Coordonnées WMTS locales
+			p = WMTS.getWmtsDim(loc.latitude, loc.longitude).subtract(mapWmtsOrig).multiply(dist2px);
+			trace.getPoints().addAll(p.getX(), p.getY());
 		}
 		trace.setStroke(Color.BLUE);
 		trace.setStrokeWidth(3);
@@ -159,6 +271,11 @@ public class IGNMapController {
 		}
 	}
 
+	/**
+	 * Terminer l'application.
+	 *
+	 * @param e
+	 */
 	@FXML
 	void exitApp(ActionEvent e) {
 		System.exit(0);

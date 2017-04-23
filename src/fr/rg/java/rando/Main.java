@@ -6,18 +6,17 @@ import javafx.scene.Scene;
 import javafx.scene.layout.BorderPane;
 import javafx.fxml.FXMLLoader;
 
-
 public class Main extends Application {
 	@Override
 	public void start(Stage primaryStage) {
 		try {
-			BorderPane root = (BorderPane)FXMLLoader.load(getClass().getResource("map_ihm.fxml"));
+			BorderPane root = (BorderPane) FXMLLoader.load(getClass().getResource("map_ihm.fxml"));
 			Scene scene = new Scene(root);
 
 			primaryStage.setScene(scene);
 			primaryStage.setTitle("Parcours de randonnées");
 			primaryStage.show();
-		} catch(Exception e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
