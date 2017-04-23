@@ -80,6 +80,9 @@ public class IGNMapController {
 	boolean useCache = true;
 	boolean ortho = false;
 
+	String multicastAddress = "224.0.71.75";
+	int multicastPort = 7175;
+
 	/**
 	 * Initialisation du contrôleur après le chargement du fichier FXML.
 	 */
@@ -96,14 +99,13 @@ public class IGNMapController {
 			@Override
 			public void run() {
 				MulticastSocket s = null;
-				String msg = "Coucou c'est Java";
+				String msg = "Hello";
 				byte[] buf = msg.getBytes();
 				DatagramPacket pkt = null;
 				try {
-					pkt = new DatagramPacket(buf, buf.length, InetAddress.getByName("224.0.71.75"), 7175);
+					pkt = new DatagramPacket(buf, buf.length, InetAddress.getByName(multicastAddress), multicastPort);
 					s = new MulticastSocket();
-					s.setLoopbackMode(true); // Ne pas envoyer sur l'interface
-												// lo
+					s.setLoopbackMode(true); // Ne pas envoyer sur lo
 				} catch (IOException e1) {
 					// TODO Auto-generated catch block
 					e1.printStackTrace();
@@ -111,7 +113,6 @@ public class IGNMapController {
 
 				while (true) {
 					try {
-						System.out.println("Hello");
 						if (s != null && pkt != null) {
 							s.send(pkt);
 						}
@@ -124,6 +125,35 @@ public class IGNMapController {
 			}
 		});
 		t.start();
+
+		// Écouter des applications compatibles sur le réseau
+		Thread t2 = new Thread(new Runnable() {
+
+			@Override
+			public void run() {
+				MulticastSocket s;
+				byte[] buf = new byte[1500];
+				DatagramPacket pkt = new DatagramPacket(buf, buf.length);
+
+				try {
+					s = new MulticastSocket(multicastPort); // écoute sur port
+															// 7175
+					InetAddress group = InetAddress.getByName(multicastAddress);
+					s.joinGroup(group);
+
+					while (true) {
+						s.receive(pkt); // attente
+
+						System.out.println("Packet de taille " + pkt.getLength() + " octets reçu" + " depuis "
+								+ pkt.getAddress() + " port " + pkt.getPort() + ":\n" + new String(pkt.getData()));
+					}
+//					s.leaveGroup(group);
+//					s.close();
+				} catch (IOException e) {
+				}
+			}
+		});
+		t2.start();
 	}
 
 	/**
