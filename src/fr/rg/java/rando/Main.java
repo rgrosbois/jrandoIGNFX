@@ -10,7 +10,9 @@ public class Main extends Application {
 	@Override
 	public void start(Stage primaryStage) {
 		try {
-			BorderPane root = (BorderPane) FXMLLoader.load(getClass().getResource("map_ihm.fxml"));
+			FXMLLoader loader = new FXMLLoader(getClass().getResource("map_ihm.fxml"));
+			BorderPane root = (BorderPane) loader.load();
+			((IGNMapController)loader.getController()).setMainStage(primaryStage);
 			Scene scene = new Scene(root);
 
 			primaryStage.setScene(scene);

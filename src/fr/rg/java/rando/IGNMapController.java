@@ -19,6 +19,8 @@ import javax.imageio.ImageIO;
 
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 import javafx.concurrent.WorkerStateEvent;
@@ -33,6 +35,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.CustomMenuItem;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
@@ -44,17 +47,19 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.image.WritablePixelFormat;
+import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Polyline;
 import javafx.stage.FileChooser;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 public class IGNMapController {
 	static final double DEFAULT_LATITUDE = 45.145f;
 	static final double DEFAULT_LONGITUDE = 5.72f;
 	static final int TILE_PIXEL_DIM = 256;
-	static String cleIGN = ""; // -> 19/11/2017
+	static String cleIGN = "ry9bshqmzmv1gao9srw610oq"; // -> 19/11/2017
 
 	// Zone où s'affiche à la fois la carte et les traces
 	@FXML
@@ -80,8 +85,17 @@ public class IGNMapController {
 	boolean useCache = true;
 	boolean ortho = false;
 
+	// Communauté réseau
 	String multicastAddress = "224.0.71.75";
 	int multicastPort = 7175;
+	long helloInterval = 5000;
+	ObservableList<String> peerList = FXCollections.observableArrayList();
+
+	Stage mainStage;
+
+	public void setMainStage(Stage mStage) {
+		mainStage = mStage;
+	}
 
 	/**
 	 * Initialisation du contrôleur après le chargement du fichier FXML.
@@ -93,6 +107,10 @@ public class IGNMapController {
 		// Centrer la carte autour de cette position
 		loadIGNMap(lastGeoLoc);
 
+		gestionCommunaute();
+	}
+
+	private void gestionCommunaute() {
 		// Signaler périodiquement la présence de l'application sur le réseau
 		Thread t = new Thread(new Runnable() {
 
@@ -117,7 +135,7 @@ public class IGNMapController {
 							s.send(pkt);
 						}
 
-						Thread.sleep(5000);
+						Thread.sleep(helloInterval);
 					} catch (InterruptedException | IOException e) {
 						e.printStackTrace();
 					}
@@ -143,17 +161,21 @@ public class IGNMapController {
 
 					while (true) {
 						s.receive(pkt); // attente
+						System.currentTimeMillis();
 
-						System.out.println("Packet de taille " + pkt.getLength() + " octets reçu" + " depuis "
-								+ pkt.getAddress() + " port " + pkt.getPort() + ":\n" + new String(pkt.getData()));
+						System.out.println(pkt.getAddress() + ":" + pkt.getPort() + " = " + new String(pkt.getData()));
+						if(!peerList.contains(pkt.getAddress().toString())) {
+							peerList.add(pkt.getAddress().toString());
+						}
 					}
-//					s.leaveGroup(group);
-//					s.close();
+					// s.leaveGroup(group);
+					// s.close();
 				} catch (IOException e) {
 				}
 			}
 		});
 		t2.start();
+
 	}
 
 	/**
@@ -196,6 +218,21 @@ public class IGNMapController {
 		System.out.println("vValue=" + scrollPane.vvalueProperty().toString());
 	}
 
+	@FXML
+	void showPeers(ActionEvent e) {
+		ListView<String> listView = new ListView<>();
+		listView.setItems(peerList);
+		AnchorPane root = new AnchorPane(listView);
+		Scene scene = new Scene(root);
+
+		Stage peerStage = new Stage();
+		peerStage.setScene(scene);
+		peerStage.setTitle("Liste de pairs");
+		peerStage.initModality(Modality.WINDOW_MODAL);
+		peerStage.initOwner(mainStage);
+		peerStage.show();
+	}
+
 	/**
 	 * Ouvrir une boîte de dialogue permettant de saisir l'adresse où recentrer
 	 * la carte. Utilisation d'une fonction d'autosuggestion lorsque plus de 3
@@ -212,6 +249,8 @@ public class IGNMapController {
 		dialog.setTitle("Adresse");
 		dialog.setHeaderText("Rechercher une adresse");
 		dialog.setContentText("adresse:");
+		dialog.initModality(Modality.WINDOW_MODAL);
+		dialog.initOwner(mainStage);
 
 		// Autocomplétion
 		TextField tf = dialog.getEditor();
