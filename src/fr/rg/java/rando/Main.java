@@ -14,7 +14,8 @@ public class Main extends Application {
 		try {
 			FXMLLoader loader = new FXMLLoader(getClass().getResource("map_ihm.fxml"));
 			BorderPane root = (BorderPane) loader.load();
-			((IGNMapController)loader.getController()).setMainStage(primaryStage);
+			IGNMapController controleur = ((IGNMapController) loader.getController());
+			controleur.setMainStage(primaryStage);
 			Scene scene = new Scene(root);
 
 			primaryStage.setScene(scene);
@@ -23,6 +24,7 @@ public class Main extends Application {
 
 				@Override
 				public void handle(WindowEvent event) {
+					controleur.closeConnections();
 					System.exit(0);
 				}
 			});

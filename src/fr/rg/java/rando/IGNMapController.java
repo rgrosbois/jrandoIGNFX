@@ -33,8 +33,6 @@ import javafx.concurrent.Task;
 import javafx.concurrent.WorkerStateEvent;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.event.ActionEvent;
-import javafx.event.Event;
-import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Point2D;
@@ -57,7 +55,6 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.image.WritablePixelFormat;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
@@ -104,6 +101,10 @@ public class IGNMapController {
 	static final long DEAD_INTERVAL = 10000;
 	ObservableList<String> peerList = FXCollections.observableArrayList();
 	ObservableList<Long> peerTimeStamp = FXCollections.observableArrayList();
+	BufferedReader netIn;
+	PrintWriter netOut;
+	Socket commSocket;
+	String netMsg = "";
 
 	// Fenêtre principale
 	Stage mainStage;
@@ -116,6 +117,24 @@ public class IGNMapController {
 	 */
 	public void setMainStage(Stage mStage) {
 		mainStage = mStage;
+	}
+
+	public void closeConnections() {
+		try {
+			if (netIn != null) {
+				netIn.close();
+			}
+			if (netOut != null) {
+				netOut.close();
+			}
+			if (commSocket != null) {
+				commSocket.close();
+			}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
 	}
 
 	/**
@@ -153,7 +172,7 @@ public class IGNMapController {
 				try {
 					pkt = new DatagramPacket(buf, buf.length, InetAddress.getByName(MULTICAST_ADDRESS), MULTICAST_PORT);
 					s = new MulticastSocket();
-					// s.setLoopbackMode(true); // Ne pas envoyer sur lo
+					s.setLoopbackMode(true); // Ne pas envoyer sur lo
 				} catch (IOException e1) {
 					e1.printStackTrace();
 				}
@@ -237,28 +256,28 @@ public class IGNMapController {
 				ServerSocket listenSocket = new ServerSocket(MULTICAST_PORT);
 
 				// Attendre le client et ouvrir les canaux de communications
-				Socket commSocket = listenSocket.accept();
+				commSocket = listenSocket.accept();
 
 				System.out.println("Pair connecté");
-				BufferedReader in = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
-				PrintWriter out = new PrintWriter(commSocket.getOutputStream());
+				netIn = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
+				netOut = new PrintWriter(commSocket.getOutputStream(), true);
 
-				String msg = in.readLine();
+				String msg = netIn.readLine();
 				while (msg != null && !msg.equals("QUIT")) {
 					switch (msg) {
 					case "INFO":
 					default:
-						out.println("coucou");
-						out.println("END");
+						netOut.println("coucou");
+						netOut.println("END");
 						break;
 					}
 
-					msg = in.readLine();
+					msg = netIn.readLine();
 				}
 
 				// Fermer les communications
-				in.close();
-				out.close();
+				netIn.close();
+				netOut.close();
 				listenSocket.close();
 
 				return null;
@@ -341,8 +360,6 @@ public class IGNMapController {
 		});
 	}
 
-	String msg = "";
-
 	/**
 	 * Connexion TCP avec un pair.
 	 *
@@ -366,29 +383,28 @@ public class IGNMapController {
 		});
 
 		try { // Connexion au pair
-			Socket commSocket = new Socket(host, MULTICAST_PORT);
-			BufferedReader in = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
-			PrintWriter out = new PrintWriter(commSocket.getOutputStream());
+			commSocket = new Socket(host, MULTICAST_PORT);
+			netIn = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
+			netOut = new PrintWriter(commSocket.getOutputStream(), true);
 
 			System.out.println("Connexion avec " + host);
 
 			// Demande d'informations
-			out.println("INFO");
+			netOut.println("INFO");
 
 			// Réception de la réponse terminant par END
-			String reponse = in.readLine();
+			String reponse = netIn.readLine();
 			while (!"END".equals(reponse)) {
-				msg += reponse + "\n";
-				reponse = in.readLine();
+				netMsg += reponse + "\n";
+				reponse = netIn.readLine();
 			}
 
 			// Terminer la discussion
-			out.println("QUIT");
+			netOut.println("QUIT");
 
 			// Fermer les canaux de communication
-			out.flush();
-			out.close();
-			in.close();
+			netOut.close();
+			netIn.close();
 			commSocket.close();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -398,7 +414,7 @@ public class IGNMapController {
 
 			@Override
 			public void run() {
-				ta.setText(msg);
+				ta.setText(netMsg);
 			}
 		});
 	}
