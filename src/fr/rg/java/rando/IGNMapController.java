@@ -90,13 +90,11 @@ public class IGNMapController {
 	// Communauté réseau
 	static final String MULTICAST_ADDRESS = "224.0.71.75";
 	static final int MULTICAST_PORT = 7175;
-	static final long HELLO_INTERVAL = 5000;
+	static final long HELLO_INTERVAL = 2000;
 	ObservableList<String> peerList = FXCollections.observableArrayList();
 	ObservableList<Long> peerTimeStamp = FXCollections.observableArrayList();
 
 	Stage mainStage;
-	Beacon beaconPeer;
-	Listening listenPeer;
 
 	public void setMainStage(Stage mStage) {
 		mainStage = mStage;
@@ -112,10 +110,98 @@ public class IGNMapController {
 		// Centrer la carte autour de cette position
 		loadIGNMap(lastGeoLoc);
 
-		beaconPeer = new Beacon();
-		beaconPeer.start();
-		listenPeer = new Listening();
-		listenPeer.start();
+		// Émettre des balises de présence sur le réseau
+		Task<Void> beaconTask = new Task<Void>() {
+
+			@Override
+			protected Void call() throws Exception {
+				// Configuration de la socket et préparation du paquet à émettre
+				MulticastSocket s = null;
+				String msg = "Hello";
+				byte[] buf = msg.getBytes();
+				DatagramPacket pkt = null;
+				try {
+					pkt = new DatagramPacket(buf, buf.length, InetAddress.getByName(MULTICAST_ADDRESS), MULTICAST_PORT);
+					s = new MulticastSocket();
+					s.setLoopbackMode(true); // Ne pas envoyer sur lo
+				} catch (IOException e1) {
+					e1.printStackTrace();
+				}
+
+				// Émission périodique
+				while (!isCancelled()) {
+					try {
+						s.send(pkt);
+
+						// Purger la liste des pairs
+						System.out.println("# Purge...");
+						Platform.runLater(() -> {
+							long now = System.currentTimeMillis();
+							Iterator<String> it = peerList.iterator();
+							Iterator<Long> it2 = peerTimeStamp.iterator();
+							while (it.hasNext()) {
+								String peer = it.next();
+								long time = it2.next();
+								if ((now - time) > 4 * HELLO_INTERVAL) {
+									it.remove();
+									it2.remove();
+								}
+							}
+						});
+						System.out.println("  # ... fin");
+
+						Thread.sleep(HELLO_INTERVAL);
+					} catch (InterruptedException | IOException e) {
+						e.printStackTrace();
+					}
+				}
+				return null;
+			}
+		};
+		new Thread(beaconTask).start();
+
+		// Écouter les applications paires
+		Task<Void> listenTask = new Task<Void>() {
+
+			@Override
+			protected Void call() throws Exception {
+				MulticastSocket s;
+				byte[] buf = new byte[1500];
+				DatagramPacket pkt = new DatagramPacket(buf, buf.length);
+
+				try {
+					// Rejoindre le groupe de multidiffusion
+					s = new MulticastSocket(MULTICAST_PORT);
+					InetAddress group = InetAddress.getByName(MULTICAST_ADDRESS);
+					s.joinGroup(group);
+
+					// Attendre les datagrammes et identifier les expéditeurs
+					while (!isCancelled()) {
+						s.receive(pkt); // attendre un message
+						String peer = pkt.getAddress().getHostAddress();
+						long timeStamp = System.currentTimeMillis();
+						System.out.println("Pair: " + peer + " , " + timeStamp);
+
+						Platform.runLater(() -> {
+							if (!peerList.contains(peer)) { // Nouveau pair
+								peerList.add(peer);
+								peerTimeStamp.add(timeStamp);
+							} else { // Pair connu, mettre à jour le timeStamp
+								peerTimeStamp.set(peerList.indexOf(peer), timeStamp);
+							}
+						});
+						System.out.println(" -> prise en compte");
+					}
+
+					// Quitter le groupe de multidiffusion
+					s.leaveGroup(group);
+					s.close();
+				} catch (IOException e) {
+				}
+				return null;
+			}
+		};
+		new Thread(listenTask).start();
 	}
 
 	/**
@@ -417,111 +503,6 @@ public class IGNMapController {
 					return null;
 				}
 			};
-		}
-
-	}
-
-	// Signaler périodiquement la présence de l'application sur le réseau
-	class Beacon extends Service<Void> {
-
-		@Override
-		protected Task<Void> createTask() {
-			Task<Void> beaconTask = new Task<Void>() {
-
-				@Override
-				protected Void call() throws Exception {
-					MulticastSocket s = null;
-					String msg = "Hello";
-					byte[] buf = msg.getBytes();
-					DatagramPacket pkt = null;
-					try {
-						pkt = new DatagramPacket(buf, buf.length, InetAddress.getByName(MULTICAST_ADDRESS),
-								MULTICAST_PORT);
-						s = new MulticastSocket();
-						s.setLoopbackMode(true); // Ne pas envoyer sur lo
-					} catch (IOException e1) {
-						e1.printStackTrace();
-					}
-
-					while (!isCancelled()) {
-						try {
-							if (s != null && pkt != null) {
-								s.send(pkt);
-							}
-
-							// Purger la liste des pairs
-							long now = System.currentTimeMillis();
-							Iterator<String> it = peerList.iterator();
-							Iterator<Long> it2 = peerTimeStamp.iterator();
-							while (it.hasNext()) {
-								String peer = it.next();
-								long time = it2.next();
-								if ((now - time) > 2 * HELLO_INTERVAL) {
-									Platform.runLater(() -> {
-										it.remove();
-										it2.remove();
-									});
-								}
-							}
-
-							Thread.sleep(HELLO_INTERVAL);
-						} catch (InterruptedException | IOException e) {
-							e.printStackTrace();
-						}
-					}
-					return null;
-				}
-			};
-			return beaconTask;
-		}
-	}
-
-	// Écouter des applications compatibles sur le réseau
-	class Listening extends Service<Void> {
-
-		@Override
-		protected Task<Void> createTask() {
-			Task<Void> listenTask = new Task<Void>() {
-
-				@Override
-				protected Void call() throws Exception {
-					MulticastSocket s;
-					byte[] buf = new byte[1500];
-					DatagramPacket pkt = new DatagramPacket(buf, buf.length);
-
-					try {
-						s = new MulticastSocket(MULTICAST_PORT); // écoute
-																	// sur
-																	// port
-																	// 7175
-						InetAddress group = InetAddress.getByName(MULTICAST_ADDRESS);
-						s.joinGroup(group);
-
-						boolean continuer = true;
-						while (continuer) {
-							s.receive(pkt); // attente
-
-							long time = System.currentTimeMillis();
-							if (!peerList.contains(pkt.getAddress().getHostAddress())) {
-								Platform.runLater(() -> {
-									peerList.add(pkt.getAddress().getHostAddress());
-									peerTimeStamp.add(time);
-								});
-							} else {
-								int index = peerList.indexOf(pkt.getAddress().getHostAddress());
-								Platform.runLater(() -> {
-									peerTimeStamp.set(index, time);
-								});
-							}
-						}
-						s.leaveGroup(group);
-						s.close();
-					} catch (IOException e) {
-					}
-					return null;
-				}
-			};
-			return listenTask;
 		}
 
 	}
