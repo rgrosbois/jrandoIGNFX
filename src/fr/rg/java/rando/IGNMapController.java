@@ -20,6 +20,8 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.prefs.BackingStoreException;
+import java.util.prefs.Preferences;
 
 import javax.imageio.ImageIO;
 
@@ -64,10 +66,19 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 public class IGNMapController {
+	// Sauvegarde du dernier répertoire de fichier KML consulté
+	private static final String KML_DIR_KEY = "last_used_dir";
+	// Sauvegarde de la latitude
+	private static final String SAVED_LATITUDE_KEY = "saved_latitude";
+	// Sauvegarde de la longitude
+	private static final String SAVED_LONGITUDE_KEY = "saved_longitude";
+
 	static final double DEFAULT_LATITUDE = 45.145f;
 	static final double DEFAULT_LONGITUDE = 5.72f;
 	static final int TILE_PIXEL_DIM = 256;
 	static String cleIGN = "ry9bshqmzmv1gao9srw610oq"; // -> 19/11/2017
+
+	Preferences prefs = Preferences.userNodeForPackage(this.getClass());
 
 	// Zone où s'affiche à la fois la carte et les traces
 	@FXML
@@ -141,8 +152,9 @@ public class IGNMapController {
 	 * Initialisation du contrôleur après le chargement du fichier FXML.
 	 */
 	public void initialize() {
-		// Géolocalisation par défaut
-		GeoLocation lastGeoLoc = new GeoLocation(DEFAULT_LONGITUDE, DEFAULT_LATITUDE);
+		// Géolocalisation initiale
+		GeoLocation lastGeoLoc = new GeoLocation(prefs.getDouble(SAVED_LONGITUDE_KEY, DEFAULT_LONGITUDE),
+				prefs.getDouble(SAVED_LATITUDE_KEY, DEFAULT_LATITUDE));
 
 		// Centrer la carte autour de cette position
 		loadIGNMap(lastGeoLoc);
@@ -257,7 +269,8 @@ public class IGNMapController {
 
 				boolean continuer = true;
 				while (continuer) {
-					// Attendre le prochain client et ouvrir les canaux de communications
+					// Attendre le prochain client et ouvrir les canaux de
+					// communications
 					commSocket = listenSocket.accept();
 
 					netIn = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
@@ -320,6 +333,15 @@ public class IGNMapController {
 		Point2D p = WMTS.getWmtsDim(centerLoc.latitude, centerLoc.longitude);
 		scrollPane.hvalueProperty().setValue((p.getX() - xmin) / (xmax - xmin));
 		scrollPane.vvalueProperty().setValue((p.getY() - ymin) / (ymax - ymin));
+
+	    prefs.putDouble(SAVED_LATITUDE_KEY, centerLoc.latitude);
+	    prefs.putDouble(SAVED_LONGITUDE_KEY, centerLoc.longitude);
+	    try {
+	      prefs.flush();
+	    } catch (BackingStoreException ex) {
+	    	ex.printStackTrace();
+	    }
+
 	}
 
 	@FXML
@@ -517,14 +539,25 @@ public class IGNMapController {
 	 */
 	@FXML
 	void loadKMLTrack(ActionEvent e) {
-		// Sélectionner le fichier
+		// Sélecteur de fichier
 		FileChooser chooser = new FileChooser();
 		FileChooser.ExtensionFilter filter = new FileChooser.ExtensionFilter("fichier KML (*.kml)", "*.kml");
 		chooser.getExtensionFilters().add(filter);
 
+		// Répertoire fichiers KML
+		chooser.setInitialDirectory(new File(prefs.get(KML_DIR_KEY, "/tmp")));
+
 		File file = chooser.showOpenDialog(contentPane.getScene().getWindow());
 		if (file == null || !file.exists())
 			return;
+
+		// Enregistrer le répertoire courant
+		prefs.put(KML_DIR_KEY, file.getParent());
+		try {
+			prefs.flush();
+		} catch (BackingStoreException ex) {
+			ex.printStackTrace();
+		}
 
 		// Extraction des géolocalisations du fichier KML
 		HashMap<String, Object> infoKML = new KMLReader().extractLocWithStAXCursor(file.getAbsolutePath());
