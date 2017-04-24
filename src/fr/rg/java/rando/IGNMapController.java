@@ -1,12 +1,17 @@
 package fr.rg.java.rando;
 
 import java.awt.Point;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.DatagramPacket;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.URL;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
@@ -28,6 +33,8 @@ import javafx.concurrent.Task;
 import javafx.concurrent.WorkerStateEvent;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.event.ActionEvent;
+import javafx.event.Event;
+import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Point2D;
@@ -40,6 +47,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.image.Image;
@@ -49,6 +57,7 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.image.WritablePixelFormat;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
@@ -79,10 +88,11 @@ public class IGNMapController {
 	@FXML
 	ProgressBar progressBar;
 
+	// Propriétés de la carte IGN
 	int nTileX = 5;
 	int nTileY = 5;
 	int ignScale = 15;
-	Point2D mapWmtsOrig; // Coordonnées WMTS de l'origine de la carte
+	Point2D mapWmtsOrig; // Coordonnées WMTS de l'origine
 	Stage infoStage;
 	boolean useCache = true;
 	boolean ortho = false;
@@ -91,11 +101,19 @@ public class IGNMapController {
 	static final String MULTICAST_ADDRESS = "224.0.71.75";
 	static final int MULTICAST_PORT = 7175;
 	static final long HELLO_INTERVAL = 2000;
+	static final long DEAD_INTERVAL = 10000;
 	ObservableList<String> peerList = FXCollections.observableArrayList();
 	ObservableList<Long> peerTimeStamp = FXCollections.observableArrayList();
 
+	// Fenêtre principale
 	Stage mainStage;
 
+	/**
+	 * Fournir la référence de la fenêtre principale.
+	 *
+	 * @param mStage
+	 *            fenêtre principale
+	 */
 	public void setMainStage(Stage mStage) {
 		mainStage = mStage;
 	}
@@ -110,6 +128,18 @@ public class IGNMapController {
 		// Centrer la carte autour de cette position
 		loadIGNMap(lastGeoLoc);
 
+		startNetworkServices();
+	}
+
+	/**
+	 * Démarrer les services réseau de l'application:
+	 * <ul>
+	 * <li>Émission de balises vers les pairs.</li>
+	 * <li>Écoute des balises émises par les pairs.</li>
+	 * <li>Serveur TCP</li>
+	 * </ul>
+	 */
+	private void startNetworkServices() {
 		// Émettre des balises de présence sur le réseau
 		Task<Void> beaconTask = new Task<Void>() {
 
@@ -123,7 +153,7 @@ public class IGNMapController {
 				try {
 					pkt = new DatagramPacket(buf, buf.length, InetAddress.getByName(MULTICAST_ADDRESS), MULTICAST_PORT);
 					s = new MulticastSocket();
-					s.setLoopbackMode(true); // Ne pas envoyer sur lo
+					// s.setLoopbackMode(true); // Ne pas envoyer sur lo
 				} catch (IOException e1) {
 					e1.printStackTrace();
 				}
@@ -134,21 +164,19 @@ public class IGNMapController {
 						s.send(pkt);
 
 						// Purger la liste des pairs
-						System.out.println("# Purge...");
 						Platform.runLater(() -> {
 							long now = System.currentTimeMillis();
 							Iterator<String> it = peerList.iterator();
 							Iterator<Long> it2 = peerTimeStamp.iterator();
 							while (it.hasNext()) {
-								String peer = it.next();
+								it.next();
 								long time = it2.next();
-								if ((now - time) > 4 * HELLO_INTERVAL) {
+								if ((now - time) > DEAD_INTERVAL) {
 									it.remove();
 									it2.remove();
 								}
 							}
 						});
-						System.out.println("  # ... fin");
 
 						Thread.sleep(HELLO_INTERVAL);
 					} catch (InterruptedException | IOException e) {
@@ -160,7 +188,7 @@ public class IGNMapController {
 		};
 		new Thread(beaconTask).start();
 
-		// Écouter les applications paires
+		// Écouter les balises émises par les pairs
 		Task<Void> listenTask = new Task<Void>() {
 
 			@Override
@@ -180,7 +208,6 @@ public class IGNMapController {
 						s.receive(pkt); // attendre un message
 						String peer = pkt.getAddress().getHostAddress();
 						long timeStamp = System.currentTimeMillis();
-						System.out.println("Pair: " + peer + " , " + timeStamp);
 
 						Platform.runLater(() -> {
 							if (!peerList.contains(peer)) { // Nouveau pair
@@ -190,7 +217,6 @@ public class IGNMapController {
 								peerTimeStamp.set(peerList.indexOf(peer), timeStamp);
 							}
 						});
-						System.out.println(" -> prise en compte");
 					}
 
 					// Quitter le groupe de multidiffusion
@@ -202,6 +228,43 @@ public class IGNMapController {
 			}
 		};
 		new Thread(listenTask).start();
+
+		// Serveur TCP
+		Task<Void> tcpServerTask = new Task<Void>() {
+
+			@Override
+			protected Void call() throws Exception {
+				ServerSocket listenSocket = new ServerSocket(MULTICAST_PORT);
+
+				// Attendre le client et ouvrir les canaux de communications
+				Socket commSocket = listenSocket.accept();
+
+				System.out.println("Pair connecté");
+				BufferedReader in = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
+				PrintWriter out = new PrintWriter(commSocket.getOutputStream());
+
+				String msg = in.readLine();
+				while (msg != null && !msg.equals("QUIT")) {
+					switch (msg) {
+					case "INFO":
+					default:
+						out.println("coucou");
+						out.println("END");
+						break;
+					}
+
+					msg = in.readLine();
+				}
+
+				// Fermer les communications
+				in.close();
+				out.close();
+				listenSocket.close();
+
+				return null;
+			}
+		};
+		new Thread(tcpServerTask).start();
 	}
 
 	/**
@@ -244,18 +307,100 @@ public class IGNMapController {
 		System.out.println("vValue=" + scrollPane.vvalueProperty().toString());
 	}
 
+	/**
+	 * Lister les pairs et intéragir avec eux.
+	 *
+	 * @param e
+	 */
 	@FXML
 	void showPeers(ActionEvent e) {
+		// Scène pour afficher la liste des pairs
 		ListView<String> listView = new ListView<>();
 		listView.setItems(peerList);
 		AnchorPane root = new AnchorPane(listView);
 		Scene scene = new Scene(root);
 
+		// Nouvelle fenêtre
 		Stage peerStage = new Stage();
 		peerStage.setScene(scene);
 		peerStage.setTitle("Liste de pairs");
 		peerStage.initOwner(mainStage);
 		peerStage.show();
+
+		// Gestion du clic
+		listView.setOnMouseClicked((event) -> {
+			String host = (String) ((ListView) event.getSource()).getSelectionModel().getSelectedItem();
+			new Thread(new Task<Void>() {
+
+				@Override
+				protected Void call() throws Exception {
+					connectToPeer(host, peerStage);
+					return null;
+				}
+			}).start();
+		});
+	}
+
+	String msg = "";
+
+	/**
+	 * Connexion TCP avec un pair.
+	 *
+	 * @param host
+	 *            adresse IP du pair
+	 * @param lv
+	 *            ListView pour afficher les résultats de communication.
+	 */
+	private void connectToPeer(String host, Stage stage) {
+		// Nouvelle scène
+		TextArea ta = new TextArea();
+		Scene scene = new Scene(new AnchorPane(ta));
+
+		Platform.runLater(new Runnable() {
+
+			@Override
+			public void run() {
+				stage.setTitle(host);
+				stage.setScene(scene);
+			}
+		});
+
+		try { // Connexion au pair
+			Socket commSocket = new Socket(host, MULTICAST_PORT);
+			BufferedReader in = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
+			PrintWriter out = new PrintWriter(commSocket.getOutputStream());
+
+			System.out.println("Connexion avec " + host);
+
+			// Demande d'informations
+			out.println("INFO");
+
+			// Réception de la réponse terminant par END
+			String reponse = in.readLine();
+			while (!"END".equals(reponse)) {
+				msg += reponse + "\n";
+				reponse = in.readLine();
+			}
+
+			// Terminer la discussion
+			out.println("QUIT");
+
+			// Fermer les canaux de communication
+			out.flush();
+			out.close();
+			in.close();
+			commSocket.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		Platform.runLater(new Runnable() {
+
+			@Override
+			public void run() {
+				ta.setText(msg);
+			}
+		});
 	}
 
 	/**
