@@ -255,30 +255,32 @@ public class IGNMapController {
 			protected Void call() throws Exception {
 				ServerSocket listenSocket = new ServerSocket(MULTICAST_PORT);
 
-				// Attendre le client et ouvrir les canaux de communications
-				commSocket = listenSocket.accept();
+				boolean continuer = true;
+				while (continuer) {
+					// Attendre le prochain client et ouvrir les canaux de communications
+					commSocket = listenSocket.accept();
 
-				System.out.println("Pair connecté");
-				netIn = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
-				netOut = new PrintWriter(commSocket.getOutputStream(), true);
+					netIn = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
+					netOut = new PrintWriter(commSocket.getOutputStream(), true);
 
-				String msg = netIn.readLine();
-				while (msg != null && !msg.equals("QUIT")) {
-					switch (msg) {
-					case "INFO":
-					default:
-						netOut.println("coucou");
-						netOut.println("END");
-						break;
+					String msg = netIn.readLine();
+					while (msg != null && !msg.equals("QUIT")) {
+						switch (msg) {
+						case "INFO":
+						default:
+							netOut.println("coucou");
+							netOut.println("END");
+							break;
+						}
+
+						msg = netIn.readLine();
 					}
 
-					msg = netIn.readLine();
+					// Fermer les communications
+					netIn.close();
+					netOut.close();
+					listenSocket.close();
 				}
-
-				// Fermer les communications
-				netIn.close();
-				netOut.close();
-				listenSocket.close();
 
 				return null;
 			}
@@ -386,8 +388,6 @@ public class IGNMapController {
 			commSocket = new Socket(host, MULTICAST_PORT);
 			netIn = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
 			netOut = new PrintWriter(commSocket.getOutputStream(), true);
-
-			System.out.println("Connexion avec " + host);
 
 			// Demande d'informations
 			netOut.println("INFO");
