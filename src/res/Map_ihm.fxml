@@ -46,10 +46,36 @@
 							text="Quitter" />
 					</items>
 				</Menu>
-				<Menu mnemonicParsing="false" text="Configuration">
+				<Menu mnemonicParsing="false" text="Navigation">
 					<items>
-						<MenuItem mnemonicParsing="false" onAction="#showInfo"
-							text="Info" />
+						<MenuItem mnemonicParsing="false" onAction="#translateLeft"
+							text="Gauche">
+							<accelerator>
+								<KeyCodeCombination alt="UP" code="LEFT"
+									control="ANY" meta="UP" shift="UP" shortcut="UP" />
+							</accelerator>
+						</MenuItem>
+						<MenuItem mnemonicParsing="false" onAction="#translateRight"
+							text="Droite">
+							<accelerator>
+								<KeyCodeCombination alt="UP" code="RIGHT"
+									control="ANY" meta="UP" shift="UP" shortcut="UP" />
+							</accelerator>
+						</MenuItem>
+						<MenuItem mnemonicParsing="false" onAction="#translateUp"
+							text="Haut">
+							<accelerator>
+								<KeyCodeCombination alt="UP" code="UP"
+									control="ANY" meta="UP" shift="UP" shortcut="UP" />
+							</accelerator>
+						</MenuItem>
+						<MenuItem mnemonicParsing="false" onAction="#translateDown"
+							text="Bas">
+							<accelerator>
+								<KeyCodeCombination alt="UP" code="DOWN"
+									control="ANY" meta="UP" shift="UP" shortcut="UP" />
+							</accelerator>
+						</MenuItem>
 					</items>
 				</Menu>
 				<Menu mnemonicParsing="false" text="?">

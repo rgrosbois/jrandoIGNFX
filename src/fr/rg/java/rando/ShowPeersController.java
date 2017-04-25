@@ -79,6 +79,7 @@ public class ShowPeersController {
 	private void connectToPeer(String host, Stage stage) {
 		// Nouvelle scène
 		TextArea ta = new TextArea();
+		ta.setEditable(false);
 		Scene scene = new Scene(new AnchorPane(ta));
 
 		Platform.runLater(new Runnable() {

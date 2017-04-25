@@ -145,7 +145,7 @@ public class IGNMapController {
 			if (commSocket != null) {
 				commSocket.close();
 			}
-			if(peerController != null) {
+			if (peerController != null) {
 				peerController.closeConnections();
 			}
 
@@ -290,7 +290,10 @@ public class IGNMapController {
 						switch (msg) {
 						case "INFO":
 						default:
-							netOut.println("coucou");
+							netOut.println("Dépôt KML : " + prefs.get(KML_DIR_KEY, "/tmp"));
+							netOut.println(
+									"Géolocalisation : " + prefs.getDouble(SAVED_LONGITUDE_KEY, DEFAULT_LONGITUDE)
+											+ ", " + prefs.getDouble(SAVED_LATITUDE_KEY, DEFAULT_LATITUDE));
 							netOut.println("END");
 							break;
 						}
@@ -343,6 +346,7 @@ public class IGNMapController {
 		scrollPane.hvalueProperty().setValue((p.getX() - xmin) / (xmax - xmin));
 		scrollPane.vvalueProperty().setValue((p.getY() - ymin) / (ymax - ymin));
 
+		// Sauvegarder le nouveau centre de la carte
 		prefs.putDouble(SAVED_LATITUDE_KEY, centerLoc.latitude);
 		prefs.putDouble(SAVED_LONGITUDE_KEY, centerLoc.longitude);
 		try {
@@ -353,10 +357,84 @@ public class IGNMapController {
 
 	}
 
+	/**
+	 * Identifier les coordonnées WMTS du centre de la carte.
+	 *
+	 * @return
+	 */
+	private Point2D getMapCenterWMTSCoordinates() {
+		Image img = mapView.getImage();
+		double x = scrollPane.getHvalue() * (img.getWidth() - scrollPane.getWidth()) + scrollPane.getWidth() / 2;
+		double y = scrollPane.getVvalue() * (img.getHeight() - scrollPane.getHeight()) + scrollPane.getHeight() / 2;
+		x = x / img.getWidth() * nTileX;
+		y = y / img.getHeight() * nTileY;
+		return new Point2D(x, y).multiply(WMTS.getTileDim(ignScale)).add(mapWmtsOrig);
+	}
+
+	/**
+	 * Décaler l'affichage de la carte d'une tuile vers la gauche (= Ouest).
+	 *
+	 * @param e
+	 */
 	@FXML
-	void showInfo(ActionEvent e) {
-		System.out.println("\nhValue=" + scrollPane.hvalueProperty().toString());
-		System.out.println("vValue=" + scrollPane.vvalueProperty().toString());
+	void translateLeft(ActionEvent e) {
+		loadIGNMap(
+				WMTS.getGeolocation(getMapCenterWMTSCoordinates().subtract(new Point2D(WMTS.getTileDim(ignScale), 0))));
+		if (trace != null && trace.getPoints().size() != 0) {
+			ObservableList<Double> list = trace.getPoints();
+			for (int i = 0; i < list.size(); i += 2) {
+				list.set(i, list.get(i) + TILE_PIXEL_DIM);
+			}
+		}
+	}
+
+	/**
+	 * Décaler l'affichage de la carte d'une tuile vers la droite (= Est).
+	 *
+	 * @param e
+	 */
+	@FXML
+	void translateRight(ActionEvent e) {
+		loadIGNMap(WMTS.getGeolocation(getMapCenterWMTSCoordinates().add(new Point2D(WMTS.getTileDim(ignScale), 0))));
+		if (trace != null && trace.getPoints().size() != 0) {
+			ObservableList<Double> list = trace.getPoints();
+			for (int i = 0; i < list.size(); i += 2) {
+				list.set(i, list.get(i) - TILE_PIXEL_DIM);
+			}
+		}
+	}
+
+	/**
+	 * Décaler l'affichage de la carte d'une tuile vers le haut (= Nord).
+	 *
+	 * @param e
+	 */
+	@FXML
+	void translateUp(ActionEvent e) {
+		loadIGNMap(
+				WMTS.getGeolocation(getMapCenterWMTSCoordinates().subtract(new Point2D(0, WMTS.getTileDim(ignScale)))));
+		if (trace != null && trace.getPoints().size() != 0) {
+			ObservableList<Double> list = trace.getPoints();
+			for (int i = 1; i < list.size(); i += 2) {
+				list.set(i, list.get(i) + TILE_PIXEL_DIM);
+			}
+		}
+	}
+
+	/**
+	 * Décaler l'affichage de la carte d'une tuile vers le bas (= Sud).
+	 *
+	 * @param e
+	 */
+	@FXML
+	void translateDown(ActionEvent e) {
+		loadIGNMap(WMTS.getGeolocation(getMapCenterWMTSCoordinates().add(new Point2D(0, WMTS.getTileDim(ignScale)))));
+		if (trace != null && trace.getPoints().size() != 0) {
+			ObservableList<Double> list = trace.getPoints();
+			for (int i = 1; i < list.size(); i += 2) {
+				list.set(i, list.get(i) - TILE_PIXEL_DIM);
+			}
+		}
 	}
 
 	/**
@@ -370,7 +448,7 @@ public class IGNMapController {
 		try {
 			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Show_peers.fxml"));
 			Parent root = loader.load();
-			peerController = (ShowPeersController)loader.getController();
+			peerController = (ShowPeersController) loader.getController();
 			Scene scene;
 			scene = new Scene(root);
 

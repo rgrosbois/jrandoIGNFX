@@ -19,6 +19,7 @@ public class Main extends Application {
 			Scene scene = new Scene(root);
 
 			primaryStage.setScene(scene);
+			primaryStage.setResizable(false);
 			primaryStage.setTitle("Parcours de randonnées");
 			primaryStage.setOnCloseRequest(new EventHandler<WindowEvent>() {
 

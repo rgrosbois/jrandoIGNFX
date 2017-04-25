@@ -77,8 +77,8 @@ public class WMTS {
 	 *            abscisse et ordonnée WMTS (en mètres)
 	 * @return longitude (x) et latitude (y) de la position.
 	 */
-	public static Point2D getGeolocation(Point2D p) {
-		return new Point2D(Math.toDegrees((p.getX() + LONG_XMIN_MERCARTOR) / RAYON_TERRE), Math
+	public static GeoLocation getGeolocation(Point2D p) {
+		return new GeoLocation(Math.toDegrees((p.getX() + LONG_XMIN_MERCARTOR) / RAYON_TERRE), Math
 				.toDegrees(2 * (Math.atan(Math.exp((-p.getY() - LAT_YMIN_MERCARTOR) / RAYON_TERRE)) - Math.PI / 4)));
 	}
 
