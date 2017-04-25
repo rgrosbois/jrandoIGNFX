@@ -78,6 +78,12 @@
 						</MenuItem>
 					</items>
 				</Menu>
+				<Menu mnemonicParsing="false" text="Configuration">
+					<items>
+						<MenuItem mnemonicParsing="false" onAction="#modifyIGNKey"
+							text="Clé IGN..." />
+					</items>
+				</Menu>
 				<Menu mnemonicParsing="false" text="?">
 					<items>
 						<MenuItem mnemonicParsing="false" text="About" />

@@ -66,19 +66,11 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 public class IGNMapController {
-	// Sauvegarde du dernier répertoire de fichier KML consulté
-	private static final String KML_DIR_KEY = "last_used_dir";
-	// Sauvegarde de la latitude
-	private static final String SAVED_LATITUDE_KEY = "saved_latitude";
-	// Sauvegarde de la longitude
-	private static final String SAVED_LONGITUDE_KEY = "saved_longitude";
-
-	static final double DEFAULT_LATITUDE = 45.145f;
-	static final double DEFAULT_LONGITUDE = 5.72f;
 	static final int TILE_PIXEL_DIM = 256;
-	static String cleIGN = "ry9bshqmzmv1gao9srw610oq"; // -> 19/11/2017
+	static String cleIGN;
 
-	Preferences prefs = Preferences.userNodeForPackage(this.getClass());
+	// Préférences utilisateur
+	Preferences prefs = Preferences.userNodeForPackage(Main.class);
 
 	// Zone où s'affiche à la fois la carte et les traces
 	@FXML
@@ -161,9 +153,13 @@ public class IGNMapController {
 	 */
 	@FXML
 	void initialize() {
+		// Clé IGN
+		cleIGN = prefs.get(Main.IGNKEY_KEY, Main.DEFAULT_IGNKEY); // ->
+																	// 19/11/2017
+
 		// Géolocalisation initiale
-		GeoLocation lastGeoLoc = new GeoLocation(prefs.getDouble(SAVED_LONGITUDE_KEY, DEFAULT_LONGITUDE),
-				prefs.getDouble(SAVED_LATITUDE_KEY, DEFAULT_LATITUDE));
+		GeoLocation lastGeoLoc = new GeoLocation(prefs.getDouble(Main.SAVED_LONGITUDE_KEY, Main.DEFAULT_LONGITUDE),
+				prefs.getDouble(Main.SAVED_LATITUDE_KEY, Main.DEFAULT_LATITUDE));
 
 		// Centrer la carte autour de cette position
 		loadIGNMap(lastGeoLoc);
@@ -290,10 +286,11 @@ public class IGNMapController {
 						switch (msg) {
 						case "INFO":
 						default:
-							netOut.println("Dépôt KML : " + prefs.get(KML_DIR_KEY, "/tmp"));
-							netOut.println(
-									"Géolocalisation : " + prefs.getDouble(SAVED_LONGITUDE_KEY, DEFAULT_LONGITUDE)
-											+ ", " + prefs.getDouble(SAVED_LATITUDE_KEY, DEFAULT_LATITUDE));
+							netOut.println("Dépôt KML : " + prefs.get(Main.KML_DIR_KEY, "/tmp"));
+							netOut.println("Clé IGN : " + prefs.get(Main.IGNKEY_KEY, Main.DEFAULT_IGNKEY));
+							netOut.println("Géolocalisation : "
+									+ prefs.getDouble(Main.SAVED_LONGITUDE_KEY, Main.DEFAULT_LONGITUDE) + ", "
+									+ prefs.getDouble(Main.SAVED_LATITUDE_KEY, Main.DEFAULT_LATITUDE));
 							netOut.println("END");
 							break;
 						}
@@ -347,8 +344,8 @@ public class IGNMapController {
 		scrollPane.vvalueProperty().setValue((p.getY() - ymin) / (ymax - ymin));
 
 		// Sauvegarder le nouveau centre de la carte
-		prefs.putDouble(SAVED_LATITUDE_KEY, centerLoc.latitude);
-		prefs.putDouble(SAVED_LONGITUDE_KEY, centerLoc.longitude);
+		prefs.putDouble(Main.SAVED_LATITUDE_KEY, centerLoc.latitude);
+		prefs.putDouble(Main.SAVED_LONGITUDE_KEY, centerLoc.longitude);
 		try {
 			prefs.flush();
 		} catch (BackingStoreException ex) {
@@ -468,6 +465,35 @@ public class IGNMapController {
 	}
 
 	/**
+	 * Ouvrir une boîte de dialogue pour éditer la clé IGN utilisée par
+	 * l'application.
+	 *
+	 * @param e
+	 */
+	@FXML
+	void modifyIGNKey(ActionEvent e) {
+		TextInputDialog dialog = new TextInputDialog(prefs.get(Main.IGNKEY_KEY, Main.DEFAULT_IGNKEY));
+		dialog.setTitle("Clé IGN");
+		dialog.setHeaderText("Clé utilisée pour télécharger les tuiles IGN");
+		dialog.setContentText("Clé:");
+		dialog.initModality(Modality.WINDOW_MODAL);
+		dialog.initOwner(mainStage);
+
+		// Afficher la boîte de dialogue
+		Optional<String> result = dialog.showAndWait();
+
+		// Traiter l'éventuelle réponse
+		result.ifPresent((cle) -> {
+			prefs.put(Main.IGNKEY_KEY, cle);
+			try {
+				prefs.flush();
+			} catch (BackingStoreException ex) {
+				ex.printStackTrace();
+			}
+		});
+	}
+
+	/**
 	 * Ouvrir une boîte de dialogue permettant de saisir l'adresse où recentrer
 	 * la carte. Utilisation d'une fonction d'autosuggestion lorsque plus de 3
 	 * caractères sont tapés sont la forme d'un menu contextuel.
@@ -571,14 +597,14 @@ public class IGNMapController {
 		chooser.getExtensionFilters().add(filter);
 
 		// Répertoire fichiers KML
-		chooser.setInitialDirectory(new File(prefs.get(KML_DIR_KEY, "/tmp")));
+		chooser.setInitialDirectory(new File(prefs.get(Main.KML_DIR_KEY, "/tmp")));
 
 		File file = chooser.showOpenDialog(contentPane.getScene().getWindow());
 		if (file == null || !file.exists())
 			return;
 
 		// Enregistrer le répertoire courant
-		prefs.put(KML_DIR_KEY, file.getParent());
+		prefs.put(Main.KML_DIR_KEY, file.getParent());
 		try {
 			prefs.flush();
 		} catch (BackingStoreException ex) {
