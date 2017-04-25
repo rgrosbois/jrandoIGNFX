@@ -25,6 +25,9 @@ import java.util.prefs.Preferences;
 
 import javax.imageio.ImageIO;
 
+import fr.rg.java.rando.util.GeoLocation;
+import fr.rg.java.rando.util.KMLReader;
+import fr.rg.java.rando.util.WMTS;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
@@ -101,9 +104,11 @@ public class IGNMapController {
 	int nTileY = 5;
 	int ignScale = 15;
 	Point2D mapWmtsOrig; // Coordonnées WMTS de l'origine
-	Stage infoStage;
 	boolean useCache = true;
 	boolean ortho = false;
+	Polyline trace; // trace courante
+
+	Stage infoStage; // fenêtre pour les courbes de dénivelés
 
 	// Communauté réseau
 	static final String MULTICAST_ADDRESS = "224.0.71.75";
@@ -334,13 +339,13 @@ public class IGNMapController {
 		scrollPane.hvalueProperty().setValue((p.getX() - xmin) / (xmax - xmin));
 		scrollPane.vvalueProperty().setValue((p.getY() - ymin) / (ymax - ymin));
 
-	    prefs.putDouble(SAVED_LATITUDE_KEY, centerLoc.latitude);
-	    prefs.putDouble(SAVED_LONGITUDE_KEY, centerLoc.longitude);
-	    try {
-	      prefs.flush();
-	    } catch (BackingStoreException ex) {
-	    	ex.printStackTrace();
-	    }
+		prefs.putDouble(SAVED_LATITUDE_KEY, centerLoc.latitude);
+		prefs.putDouble(SAVED_LONGITUDE_KEY, centerLoc.longitude);
+		try {
+			prefs.flush();
+		} catch (BackingStoreException ex) {
+			ex.printStackTrace();
+		}
 
 	}
 
@@ -567,7 +572,14 @@ public class IGNMapController {
 		loadIGNMap(list.get(0));
 
 		// Créer et afficher la trace correspondante
-		Polyline trace = new Polyline();
+		if (trace == null) {
+			trace = new Polyline();
+			trace.setStroke(Color.BLUE);
+			trace.setStrokeWidth(3);
+			contentPane.getChildren().add(trace);
+		} else { // supprimer les points de la trace existante
+			trace.getPoints().clear();
+		}
 		Point2D p;
 		double dist2px = TILE_PIXEL_DIM / WMTS.getTileDim(ignScale);
 		for (GeoLocation loc : list) {
@@ -575,15 +587,14 @@ public class IGNMapController {
 			p = WMTS.getWmtsDim(loc.latitude, loc.longitude).subtract(mapWmtsOrig).multiply(dist2px);
 			trace.getPoints().addAll(p.getX(), p.getY());
 		}
-		trace.setStroke(Color.BLUE);
-		trace.setStrokeWidth(3);
-		contentPane.getChildren().add(trace);
 
 		// Créer et afficher les courbes de dénivelé
-		infoStage = new Stage();
-		infoStage.setTitle("Informations");
+		if (infoStage == null) { // Réutiliser la fenêtre existante
+			infoStage = new Stage();
+			infoStage.setTitle("Informations");
+		}
 		try {
-			FXMLLoader loader = new FXMLLoader(getClass().getResource("info_ihm.fxml"));
+			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/info_ihm.fxml"));
 			Parent root = loader.load();
 			Scene scene = new Scene(root);
 			infoStage.setScene(scene);
@@ -592,7 +603,6 @@ public class IGNMapController {
 			InfoControler ic = loader.getController();
 			ic.setTrace(infoKML);
 		} catch (IOException e1) {
-			System.err.println("Erreur d'ouverture du FXML des informations");
 			e1.printStackTrace();
 		}
 	}

@@ -12,7 +12,7 @@ public class Main extends Application {
 	@Override
 	public void start(Stage primaryStage) {
 		try {
-			FXMLLoader loader = new FXMLLoader(getClass().getResource("map_ihm.fxml"));
+			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/map_ihm.fxml"));
 			BorderPane root = (BorderPane) loader.load();
 			IGNMapController controleur = ((IGNMapController) loader.getController());
 			controleur.setMainStage(primaryStage);

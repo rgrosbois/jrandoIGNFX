@@ -22,6 +22,7 @@ import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import fr.rg.java.rando.util.GeoLocation;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 

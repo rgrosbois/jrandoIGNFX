@@ -1,4 +1,4 @@
-package fr.rg.java.rando;
+package fr.rg.java.rando.util;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
