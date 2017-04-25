@@ -47,10 +47,8 @@ import javafx.scene.Scene;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.CustomMenuItem;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.image.Image;
@@ -60,7 +58,6 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.image.WritablePixelFormat;
-import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Polyline;
@@ -122,8 +119,10 @@ public class IGNMapController {
 	Socket commSocket;
 	String netMsg = "";
 
-	// Fenêtre principale
-	Stage mainStage;
+	// Fenêtres
+	Stage mainStage; // Fenêtre principale
+	Stage peerStage; // Fenêtre des pairs
+	ShowPeersController peerController;
 
 	/**
 	 * Fournir la référence de la fenêtre principale.
@@ -146,6 +145,10 @@ public class IGNMapController {
 			if (commSocket != null) {
 				commSocket.close();
 			}
+			if(peerController != null) {
+				peerController.closeConnections();
+			}
+
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -156,7 +159,8 @@ public class IGNMapController {
 	/**
 	 * Initialisation du contrôleur après le chargement du fichier FXML.
 	 */
-	public void initialize() {
+	@FXML
+	void initialize() {
 		// Géolocalisation initiale
 		GeoLocation lastGeoLoc = new GeoLocation(prefs.getDouble(SAVED_LONGITUDE_KEY, DEFAULT_LONGITUDE),
 				prefs.getDouble(SAVED_LATITUDE_KEY, DEFAULT_LATITUDE));
@@ -356,94 +360,33 @@ public class IGNMapController {
 	}
 
 	/**
-	 * Lister les pairs et intéragir avec eux.
+	 * Afficher la liste des pairs.
 	 *
 	 * @param e
 	 */
 	@FXML
 	void showPeers(ActionEvent e) {
-		// Scène pour afficher la liste des pairs
-		ListView<String> listView = new ListView<>();
-		listView.setItems(peerList);
-		AnchorPane root = new AnchorPane(listView);
-		Scene scene = new Scene(root);
+		// Boîte de dialogue pour afficher les pairs
+		try {
+			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Show_peers.fxml"));
+			Parent root = loader.load();
+			peerController = (ShowPeersController)loader.getController();
+			Scene scene;
+			scene = new Scene(root);
 
-		// Nouvelle fenêtre
-		Stage peerStage = new Stage();
-		peerStage.setScene(scene);
-		peerStage.setTitle("Liste de pairs");
-		peerStage.initOwner(mainStage);
-		peerStage.show();
-
-		// Gestion du clic
-		listView.setOnMouseClicked((event) -> {
-			String host = (String) ((ListView) event.getSource()).getSelectionModel().getSelectedItem();
-			new Thread(new Task<Void>() {
-
-				@Override
-				protected Void call() throws Exception {
-					connectToPeer(host, peerStage);
-					return null;
-				}
-			}).start();
-		});
-	}
-
-	/**
-	 * Connexion TCP avec un pair.
-	 *
-	 * @param host
-	 *            adresse IP du pair
-	 * @param lv
-	 *            ListView pour afficher les résultats de communication.
-	 */
-	private void connectToPeer(String host, Stage stage) {
-		// Nouvelle scène
-		TextArea ta = new TextArea();
-		Scene scene = new Scene(new AnchorPane(ta));
-
-		Platform.runLater(new Runnable() {
-
-			@Override
-			public void run() {
-				stage.setTitle(host);
-				stage.setScene(scene);
+			if (peerStage == null) {
+				peerStage = new Stage();
+				peerStage.initOwner(mainStage);
 			}
-		});
-
-		try { // Connexion au pair
-			commSocket = new Socket(host, MULTICAST_PORT);
-			netIn = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
-			netOut = new PrintWriter(commSocket.getOutputStream(), true);
-
-			// Demande d'informations
-			netOut.println("INFO");
-
-			// Réception de la réponse terminant par END
-			String reponse = netIn.readLine();
-			while (!"END".equals(reponse)) {
-				netMsg += reponse + "\n";
-				reponse = netIn.readLine();
-			}
-
-			// Terminer la discussion
-			netOut.println("QUIT");
-
-			// Fermer les canaux de communication
-			netOut.close();
-			netIn.close();
-			commSocket.close();
-		} catch (IOException e) {
-			e.printStackTrace();
+			peerStage.setScene(scene);
+			peerStage.setTitle("Liste de pairs");
+			peerStage.show();
+			peerController.setPeerStage(peerStage);
+			peerController.setPeerList(peerList);
+		} catch (IOException e1) {
+			e1.printStackTrace();
 		}
 
-		Platform.runLater(new Runnable() {
-
-			@Override
-			public void run() {
-				ta.setText(netMsg);
-			}
-		});
 	}
 
 	/**
@@ -594,7 +537,7 @@ public class IGNMapController {
 			infoStage.setTitle("Informations");
 		}
 		try {
-			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/info_ihm.fxml"));
+			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Info_ihm.fxml"));
 			Parent root = loader.load();
 			Scene scene = new Scene(root);
 			infoStage.setScene(scene);
