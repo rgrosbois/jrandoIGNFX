@@ -159,26 +159,21 @@ public class ShowPeersController {
 			System.out.println("Taille=" + fileSize);
 
 			// Récupérer les octets du fichier et sauvegarder le fichier
-			int bufSize = 1024;
-			byte[] buf = new byte[bufSize];
+			byte[] buf = new byte[fileSize];
 			File newFile = new File(prefs.get(Main.KML_DIR_KEY, "/tmp"), fileName);
-			FileOutputStream fileOut = new FileOutputStream(newFile);
-
-			while (fileSize > 0) {
-				if (fileSize >= bufSize) {
-					System.out.println(" -> 1024");
-					netInB.read(buf, 0, bufSize);
-					fileOut.write(buf, 0, bufSize);
-					fileSize -= bufSize;
-				} else {
-					System.out.println(" -> " + fileSize);
-					netInB.read(buf, 0, fileSize);
-					fileOut.write(buf, 0, fileSize);
-					fileSize = 0;
+			int bytesRead = netInB.read(buf, 0, fileSize);
+			int current = bytesRead;
+			System.out.println(current + "/" + fileSize);
+			while (current < fileSize) {
+				bytesRead = netInB.read(buf, current, fileSize - current);
+				if (bytesRead >= 0) {
+					current += bytesRead;
 				}
-				System.out.println("FileSize=" + fileSize);
+				System.out.println(current + "/" + fileSize);
 			}
-
+			// Sauver le fichier
+			FileOutputStream fileOut = new FileOutputStream(newFile);
+			fileOut.write(buf, 0, fileSize);
 			fileOut.flush();
 			fileOut.close();
 			System.out.println("Fichier " + newFile.getAbsolutePath() + " enregistré (" + newFile.length() + ")");
