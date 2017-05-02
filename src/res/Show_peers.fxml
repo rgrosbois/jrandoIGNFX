@@ -1,12 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
-<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
 
-
-<AnchorPane xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/8.0.111"
-	fx:controller="fr.rg.java.rando.ShowPeersController">
-	<children>
-		<ListView fx:id="listView" prefHeight="200.0" prefWidth="200.0" />
-	</children>
-</AnchorPane>
+<HBox spacing="5.0" xmlns="http://javafx.com/javafx/8.0.111" xmlns:fx="http://javafx.com/fxml/1" fx:controller="fr.rg.java.rando.ShowPeersController">
+   <children>
+      <VBox>
+         <children>
+            <Label text="Pairs :" />
+      		<ListView fx:id="peerLV" prefHeight="200.0" prefWidth="200.0" />
+            <Label text="Info :" />
+            <TextArea fx:id="infoTA" prefHeight="200.0" prefWidth="200.0" />
+         </children>
+      </VBox>
+      <VBox>
+         <children>
+            <Label text="Nouveaux fichiers :" />
+            <ListView fx:id="filesLV" prefWidth="200.0" />
+         </children>
+      </VBox>
+   </children>
+   <padding>
+      <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+   </padding>
+</HBox>

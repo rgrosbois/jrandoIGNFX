@@ -138,7 +138,7 @@ public class IGNMapController {
 				commSocket.close();
 			}
 			if (peerController != null) {
-				peerController.closeConnections();
+				peerController.closeTCPConnection();
 			}
 
 		} catch (IOException e) {
@@ -301,8 +301,8 @@ public class IGNMapController {
 					// Fermer les communications
 					netIn.close();
 					netOut.close();
-					listenSocket.close();
 				}
+				listenSocket.close();
 
 				return null;
 			}
