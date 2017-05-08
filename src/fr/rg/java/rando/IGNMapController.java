@@ -1,6 +1,7 @@
 package fr.rg.java.rando;
 
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -29,6 +30,9 @@ import fr.rg.java.rando.util.GeoLocation;
 import fr.rg.java.rando.util.KMLReader;
 import fr.rg.java.rando.util.WMTS;
 import javafx.application.Platform;
+import javafx.beans.InvalidationListener;
+import javafx.beans.Observable;
+import javafx.beans.binding.Bindings;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
@@ -48,6 +52,7 @@ import javafx.scene.control.ContextMenu;
 import javafx.scene.control.CustomMenuItem;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
@@ -60,6 +65,7 @@ import javafx.scene.image.WritableImage;
 import javafx.scene.image.WritablePixelFormat;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Line;
 import javafx.scene.shape.Polyline;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
@@ -80,7 +86,7 @@ public class IGNMapController {
 	@FXML
 	ImageView mapView;
 
-	// Gère l'affichage de la carte
+	// Gère le défilement de la carte
 	@FXML
 	ScrollPane scrollPane;
 
@@ -154,28 +160,11 @@ public class IGNMapController {
 	@FXML
 	void initialize() {
 		// Clé IGN
-		cleIGN = prefs.get(Main.IGNKEY_KEY, Main.DEFAULT_IGNKEY); // ->
-																	// 19/11/2017
+		cleIGN = prefs.get(Main.IGNKEY_KEY, Main.DEFAULT_IGNKEY); // 19/11/2017
 
-		// Géolocalisation initiale
-		GeoLocation lastGeoLoc = new GeoLocation(prefs.getDouble(Main.SAVED_LONGITUDE_KEY, Main.DEFAULT_LONGITUDE),
-				prefs.getDouble(Main.SAVED_LATITUDE_KEY, Main.DEFAULT_LATITUDE));
-
-		// Centrer la carte autour de cette position
-		loadIGNMap(lastGeoLoc);
-
-		startNetworkServices();
-	}
-
-	/**
-	 * Démarrer les services réseau de l'application:
-	 * <ul>
-	 * <li>Émission de balises vers les pairs.</li>
-	 * <li>Écoute des balises émises par les pairs.</li>
-	 * <li>Serveur TCP</li>
-	 * </ul>
-	 */
-	private void startNetworkServices() {
+		// +-----------------+
+		// | Services réseau |
+		// +-----------------+
 		// Émettre des balises de présence sur le réseau
 		Task<Void> beaconTask = new Task<Void>() {
 
@@ -308,11 +297,57 @@ public class IGNMapController {
 			}
 		};
 		new Thread(tcpServerTask).start();
+
+	}
+
+	/**
+	 * Spécifier le nombre de tuiles à afficher sur la carte. Ce nombre
+	 * dépendant de la taille de la fenêtre, cette méthode doit donc être
+	 * appelée aussitôt après le chargement du fichier FXML de la scène.
+	 *
+	 * @param tX
+	 *            nombre (impair) de tuiles selon l'horizontale
+	 * @param tY
+	 *            nombre (impair) de tuiles selon la verticale
+	 */
+	void setTilesNumber(int tX, int tY) {
+		nTileX = tX;
+		nTileY = tY;
+
+		// Géolocalisation initiale
+		GeoLocation lastGeoLoc = new GeoLocation(prefs.getDouble(Main.SAVED_LONGITUDE_KEY, Main.DEFAULT_LONGITUDE),
+				prefs.getDouble(Main.SAVED_LATITUDE_KEY, Main.DEFAULT_LATITUDE));
+
+		// Centrer la carte autour de cette position
+		loadIGNMap(lastGeoLoc);
+
+		// Pour le premier recentrage, il faut attendre que le scrollPane ait
+		// ses dimensions finales
+		scrollPane.widthProperty().addListener(new ChangeListener<Number>() {
+
+			@Override
+			public void changed(ObservableValue<? extends Number> observable, Number oldValue, Number newValue) {
+				if (scrollPane.getWidth() > 0 && scrollPane.getWidth() < mapView.getImage().getWidth()) {
+					setScrollPaneCenter(lastGeoLoc.longitude, lastGeoLoc.latitude);
+					scrollPane.widthProperty().removeListener(this);
+				}
+			}
+		});
+		scrollPane.heightProperty().addListener(new ChangeListener<Number>() {
+
+			@Override
+			public void changed(ObservableValue<? extends Number> observable, Number oldValue, Number newValue) {
+				if (scrollPane.getHeight() > 0 && scrollPane.getHeight() < mapView.getImage().getHeight()) {
+					setScrollPaneCenter(lastGeoLoc.longitude, lastGeoLoc.latitude);
+					scrollPane.heightProperty().removeListener(this);
+				}
+			}
+		});
 	}
 
 	/**
 	 * Récupérer et afficher les tuiles entourant et contenant la
-	 * géolocalisation spécifiée.
+	 * géolocalisation spécifiée et centrer l'affichage sur cette position.
 	 *
 	 * @param centerLoc
 	 *            Géolocalisation centrale
@@ -325,23 +360,18 @@ public class IGNMapController {
 		// Identifier la tuile centrale et les tuiles limites
 		Point tileCenter = WMTS.getTileIndex(centerLoc.longitude, centerLoc.latitude, ignScale);
 		int tileRowMin = tileCenter.y - nTileY / 2;
-		int tileRowMax = tileCenter.y + nTileY / 2;
 		int tileColMin = tileCenter.x - nTileX / 2;
-		int tileColMax = tileCenter.x + nTileX / 2;
-		mapWmtsOrig = new Point2D(tileColMin * WMTS.getTileDim(ignScale), tileRowMin * WMTS.getTileDim(ignScale));
-		TileLoadingService tls = new TileLoadingService();
+
+		// Coordonnées WMTS de l'origine du repère
+		mapWmtsOrig = new Point2D(tileColMin, tileRowMin).multiply(WMTS.getTileDim(ignScale));
+
+		// Chargement des tuiles dans un fil d'exécution distinct
+		TileLoadingService tls = new TileLoadingService(new Rectangle(tileColMin, tileRowMin, nTileX, nTileY));
 		progressBar.progressProperty().bind(tls.progressProperty());
-		tls.setBounds(tileColMin, tileColMax, tileRowMin, tileRowMax);
 		tls.start();
 
-		// Centrer la carte autour de la position courante
-		double xmin = tileColMin * WMTS.getTileDim(ignScale);
-		double xmax = tileColMax * WMTS.getTileDim(ignScale);
-		double ymin = tileRowMin * WMTS.getTileDim(ignScale);
-		double ymax = tileRowMax * WMTS.getTileDim(ignScale);
-		Point2D p = WMTS.getWmtsDim(centerLoc.latitude, centerLoc.longitude);
-		scrollPane.hvalueProperty().setValue((p.getX() - xmin) / (xmax - xmin));
-		scrollPane.vvalueProperty().setValue((p.getY() - ymin) / (ymax - ymin));
+		// Centrer la carte sur la géolocalisation
+		setScrollPaneCenter(centerLoc.longitude, centerLoc.latitude);
 
 		// Sauvegarder le nouveau centre de la carte
 		prefs.putDouble(Main.SAVED_LATITUDE_KEY, centerLoc.latitude);
@@ -352,6 +382,36 @@ public class IGNMapController {
 			ex.printStackTrace();
 		}
 
+	}
+
+	/**
+	 * Centrer l'affichage de l'affichage de l'image sur une géolocalisation
+	 * donnée.
+	 *
+	 * @param longitude
+	 * @param latitude
+	 */
+	private void setScrollPaneCenter(double longitude, double latitude) {
+		// Calculer les coordonnées en pixels dans l'image
+		Point2D p = WMTS.getWmtsDim(latitude, longitude).subtract(mapWmtsOrig)
+				.multiply(TILE_PIXEL_DIM / WMTS.getTileDim(ignScale));
+		// Dimension du ScrollPane
+		double scWidth = scrollPane.getWidth();
+		double scHeight = scrollPane.getHeight();
+		scrollPane.hvalueProperty().setValue((p.getX() - scWidth / 2) / (nTileX * TILE_PIXEL_DIM - scWidth));
+		scrollPane.vvalueProperty().setValue((p.getY() - scHeight / 2) / (nTileY * TILE_PIXEL_DIM - scHeight));
+	}
+
+	/**
+	 * Identifier les coordonnées du centre du scrollpane dans l'image
+	 *
+	 * @return
+	 */
+	private Point2D getScrollPaneCenter() {
+		Image img = mapView.getImage();
+		double minX = scrollPane.getHvalue() * (img.getWidth() - scrollPane.getWidth());
+		double minY = scrollPane.getVvalue() * (img.getHeight() - scrollPane.getHeight());
+		return new Point2D(minX + scrollPane.getWidth() / 2, minY + scrollPane.getHeight() / 2);
 	}
 
 	/**
@@ -493,10 +553,29 @@ public class IGNMapController {
 		});
 	}
 
+	@FXML
+	void changerZoomIGN(ActionEvent e) {
+		RadioMenuItem item = (RadioMenuItem) e.getSource();
+
+		int newScale = item.getText().contains("15") ? 15 : 16;
+		if (newScale != ignScale) {
+			ignScale = newScale;
+			loadIGNMap(WMTS.getGeolocation(getMapCenterWMTSCoordinates()));
+
+			// Modifier la trace -> à revoir
+			if (trace != null && trace.getPoints().size() != 0) {
+				ObservableList<Double> list = trace.getPoints();
+				for (int i = 0; i < list.size(); i += 2) {
+					list.set(i, list.get(i) + TILE_PIXEL_DIM);
+				}
+			}
+		}
+	}
+
 	/**
-	 * Ouvrir une boîte de dialogue permettant de saisir l'adresse où recentrer
-	 * la carte. Utilisation d'une fonction d'autosuggestion lorsque plus de 3
-	 * caractères sont tapés sont la forme d'un menu contextuel.
+	 * Ouvrir une boîte de dialogue pour saisir l'adresse où recentrer la carte.
+	 * Apparition de suggestions (sous la forme d'un menu contextuel) lorsque
+	 * plus de 3 caractères sont entrés.
 	 *
 	 * @param e
 	 */
@@ -575,6 +654,9 @@ public class IGNMapController {
 			as.setOnSucceeded((WorkerStateEvent event) -> {
 				ArrayList<GeoLocation> loc = (ArrayList<GeoLocation>) event.getSource().getValue();
 				if (loc.size() > 0) {
+					// Supprimer une éventuelle trace en mémoire
+					trace = null;
+					// Recentrer la carte
 					loadIGNMap(loc.get(0));
 				}
 			});
@@ -669,13 +751,11 @@ public class IGNMapController {
 	 */
 	class TileLoadingService extends Service<Void> {
 
-		int tileColMin, tileColMax, tileRowMin, tileRowMax;
+		// int tileColMin, tileColMax, tileRowMin, tileRowMax;
+		Rectangle tilesBounds;
 
-		void setBounds(int tcMin, int tcMax, int trMin, int trMax) {
-			tileColMin = tcMin;
-			tileColMax = tcMax;
-			tileRowMin = trMin;
-			tileRowMax = trMax;
+		public TileLoadingService(Rectangle bounds) {
+			tilesBounds = bounds;
 		}
 
 		@Override
@@ -705,11 +785,12 @@ public class IGNMapController {
 
 					int[] buffer = new int[TILE_PIXEL_DIM * TILE_PIXEL_DIM];
 					WritablePixelFormat<IntBuffer> pxFormat = PixelFormat.getIntArgbInstance();
-					int maxIterations = (tileRowMax - tileRowMin + 1) * (tileColMax - tileColMin + 1);
+					int maxIterations = tilesBounds.width * tilesBounds.height;
 					int iterations = 1;
-					for (int r = tileRowMin; r <= tileRowMax; r++) {
-						for (int c = tileColMin; c <= tileColMax; c++) {
-							key = (ortho ? "ortho-" : "") + "z" + ignScale + "-r" + r + "-c" + c;
+					for (int row = 0; row < tilesBounds.height; row++) {
+						for (int col = 0; col < tilesBounds.width; col++) {
+							key = (ortho ? "ortho-" : "") + "z" + ignScale + "-r" + (row + tilesBounds.y) + "-c"
+									+ (col + tilesBounds.x);
 							cacheFile = new File(localTileCacheDir, key + ".jpg");
 							if (useCache && cacheFile.exists()) { // Récupérer
 																	// depuis le
@@ -724,7 +805,8 @@ public class IGNMapController {
 											+ (ortho ? "&LAYER=ORTHOIMAGERY.ORTHOPHOTOS"
 													: "&LAYER=GEOGRAPHICALGRIDSYSTEMS.MAPS")
 											+ "&STYLE=normal" + "&TILEMATRIXSET=PM&TILEMATRIX=" + ignScale + "&TILEROW="
-											+ r + "&TILECOL=" + c + "&FORMAT=image/jpeg");
+											+ (row + tilesBounds.y) + "&TILECOL=" + (col + tilesBounds.x)
+											+ "&FORMAT=image/jpeg");
 									connection = (HttpURLConnection) url.openConnection();
 									// connection = (HttpURLConnection) url
 									// .openConnection(new
@@ -745,8 +827,8 @@ public class IGNMapController {
 							pxReader = img.getPixelReader();
 							pxReader.getPixels(0, 0, TILE_PIXEL_DIM, TILE_PIXEL_DIM, pxFormat, buffer, 0,
 									TILE_PIXEL_DIM);
-							pxWriter.setPixels((c - tileColMin) * TILE_PIXEL_DIM, (r - tileRowMin) * TILE_PIXEL_DIM,
-									TILE_PIXEL_DIM, TILE_PIXEL_DIM, pxReader, 0, 0);
+							pxWriter.setPixels(col * TILE_PIXEL_DIM, row * TILE_PIXEL_DIM, TILE_PIXEL_DIM,
+									TILE_PIXEL_DIM, pxReader, 0, 0);
 							updateProgress(iterations++, maxIterations);
 						}
 					}

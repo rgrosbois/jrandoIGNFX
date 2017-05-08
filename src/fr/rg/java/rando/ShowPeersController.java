@@ -144,7 +144,6 @@ public class ShowPeersController {
 	private void downloadFileFromPeer(String host, String fileName, Stage stage) {
 		String reponse;
 
-		System.out.println("Télécharger " + fileName + " depuis " + host);
 		// Connexion au pair
 		try {
 			openTCPConnection(host);
@@ -156,41 +155,37 @@ public class ShowPeersController {
 			// Récupérer la taille du fichier
 			reponse = netIn.readLine();
 			int fileSize = Integer.parseInt(reponse);
-			System.out.println("Taille=" + fileSize);
 
 			// Récupérer les octets du fichier et sauvegarder le fichier
 			byte[] buf = new byte[fileSize];
 			File newFile = new File(prefs.get(Main.KML_DIR_KEY, "/tmp"), fileName);
 			int bytesRead = netInB.read(buf, 0, fileSize);
 			int current = bytesRead;
-			System.out.println(current + "/" + fileSize);
 			while (current < fileSize) {
 				bytesRead = netInB.read(buf, current, fileSize - current);
 				if (bytesRead >= 0) {
 					current += bytesRead;
 				}
-				System.out.println(current + "/" + fileSize);
 			}
 			// Sauver le fichier
 			FileOutputStream fileOut = new FileOutputStream(newFile);
 			fileOut.write(buf, 0, fileSize);
 			fileOut.flush();
 			fileOut.close();
-			System.out.println("Fichier " + newFile.getAbsolutePath() + " enregistré (" + newFile.length() + ")");
 
 			reponse = netIn.readLine(); // END
-			System.out.println("réponse = " + reponse);
 			netOut.println("QUIT");
 
 			closeTCPConnection();
 
-			// Supprimer de la liste des nouveaux fichiers
+			// Supprimer de la liste des nouveaux fichiers et ouvrir la trace sur la carte
 			Platform.runLater(new Runnable() {
 
 				@Override
 				public void run() {
-					System.out.println("Enlever " + fileName + " de la liste");
+					// Suppression du fichier de la liste
 					filesLV.getItems().remove(fileName);
+
 				}
 			});
 

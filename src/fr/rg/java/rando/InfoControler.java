@@ -7,11 +7,11 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.StringTokenizer;
 
 import fr.rg.java.rando.util.GeoLocation;
 import fr.rg.java.rando.util.KMLReader;
-import javafx.collections.ObservableList;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
@@ -19,6 +19,7 @@ import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.Pane;
 
 public class InfoControler {
@@ -28,7 +29,32 @@ public class InfoControler {
 	@FXML
 	ProgressBar progressBar;
 
+	@FXML
+	TextField distanceTF;
+
+	@FXML
+	TextField altMinTF;
+
+	@FXML
+	TextField altMaxTF;
+
+	@FXML
+	TextField denivPosTF;
+
+	@FXML
+	TextField denivNegTF;
+
+	@FXML
+	TextField dureeTotTF;
+
+	@FXML
+	TextField dureeSansPauseTF;
+
 	final int nbLocInQuery = 50;
+
+	static final float SEUIL_VITESSE = 1.5f; // en km/h (calcul des pauses)
+	static final float MIN_DELTA_ALT = 10f; // en m (lissage des altitudes)
+	static final float MAX_DELTA_ALT = 50f; // en m (lissage des altitudes)
 
 	void setTrace(HashMap<String, Object> bundle) {
 		// Création des axes
@@ -53,9 +79,51 @@ public class InfoControler {
 		serieGPS.setName("Capteur GPS");
 		serieModel.setName("Modélisation terrain");
 		lineChart.getData().add(serieGPS);
+
+		GeoLocation lastLoc = null;
+		float denivPos = 0;
+		float denivNeg = 0;
+		boolean pauseDetectee = false;
+		long debutPause = 0; // Instant de départ de la pause
+		long dureePause = 0; // Durée de la pause
+		float deltaElev;
 		for (GeoLocation loc : list) {
-			serieGPS.getData().add(new XYChart.Data<>(loc.length / 1000., loc.kmlElevation));
-//			serieModel.getData().add(new XYChart.Data<>(loc.length / 1000., loc.modelElevation));
+			loc.dispElevation = loc.kmlElevation;
+
+			if (lastLoc != null) {
+				// Lisser l'altitude
+				deltaElev = loc.dispElevation - lastLoc.dispElevation;
+				if ((Math.abs(deltaElev) < MIN_DELTA_ALT) || (Math.abs(deltaElev) > MAX_DELTA_ALT)) {
+					loc.dispElevation = lastLoc.dispElevation;
+					deltaElev = 0;
+				}
+				// Dénivelés
+				if (deltaElev > 0) {
+					denivPos += deltaElev;
+				} else {
+					denivNeg += -deltaElev;
+				}
+				// Détection des pauses
+				if (loc.speed < SEUIL_VITESSE) { // Pas de mouvement
+					if (!pauseDetectee) { // Début de pause
+						debutPause = loc.timeStampS; // sauvegarder l'instant de
+														// départ
+						pauseDetectee = true;
+					}
+				} else { // Mouvement détecté
+					if (pauseDetectee) { // Fin de pause
+						dureePause += (loc.timeStampS - debutPause); // Calcul
+																		// de
+																		// la
+																		// durée
+						pauseDetectee = false;
+					}
+				}
+			}
+			serieGPS.getData().add(new XYChart.Data<>(loc.length / 1000., loc.dispElevation));
+			// serieModel.getData().add(new XYChart.Data<>(loc.length / 1000.,
+			// loc.modelElevation));
+			lastLoc = loc;
 		}
 		// Données du modèle 3D
 		lineChart.getData().add(serieModel);
@@ -64,6 +132,17 @@ public class InfoControler {
 		els.setParam(list, serieModel);
 		progressBar.progressProperty().bind(els.progressProperty());
 		els.start();
+
+		// Afficher les statistiques du parcours
+		altMinTF.setText((int) bundle.get(KMLReader.ALT_MIN_KEY) + " m");
+		altMaxTF.setText((int) bundle.get(KMLReader.ALT_MAX_KEY) + " m");
+		if (lastLoc != null) {
+			distanceTF.setText(dist2String(lastLoc.length));
+			denivPosTF.setText(dist2String(denivPos));
+			denivNegTF.setText(dist2String(denivNeg));
+			dureeTotTF.setText(time2String(lastLoc.timeStampS - list.get(0).timeStampS, true));
+			dureeSansPauseTF.setText(time2String(lastLoc.timeStampS - list.get(0).timeStampS - dureePause, true));
+		}
 	}
 
 	class ElevationLoadingService extends Service<Void> {
@@ -133,7 +212,6 @@ public class InfoControler {
 			super.succeeded();
 		}
 
-
 	}
 
 	/**
@@ -190,6 +268,45 @@ public class InfoControler {
 		} catch (IOException ex) {
 			System.err.println("Erreur de communication avec le serveur");
 		}
+	}
+
+	/**
+	 * Chaîne représentant une distance avec l'unité adéquate.
+	 *
+	 * @return Distance en mètres (si inférieure à 1km) ou kilomètre sinon.
+	 */
+	private String dist2String(float distance) {
+		if (distance < 1000) { // Moins d'1km -> afficher en mètres
+			return String.format(Locale.getDefault(), "%dm", (int) distance);
+		} else { // Afficher en kilomètres
+			return String.format(Locale.getDefault(), "%.1fkm", distance / 1000f);
+		}
+	}
+
+	/**
+	 * Chaîne représentant une durée au format __h__mn__s.
+	 *
+	 * @param duree
+	 *            Durée en secondes.
+	 * @param showSeconds
+	 *            Afficher ou non les secondes
+	 * @return
+	 */
+	private static String time2String(long duree, boolean showSeconds) {
+		String s = "";
+
+		if (duree > 3600) { // Quantité d'heures
+			s += String.format(Locale.getDefault(), "%dh", duree / 60 / 60);
+		}
+
+		if (duree % 3600 > 60) { // Quantité de minutes
+			s += String.format(Locale.getDefault(), "%dmn", (duree % 3600) / 60);
+		}
+
+		if (showSeconds && duree % 60 != 0) { // Quantité de secondes
+			s += String.format(Locale.getDefault(), "%ds", duree % 60);
+		}
+		return s;
 	}
 
 }

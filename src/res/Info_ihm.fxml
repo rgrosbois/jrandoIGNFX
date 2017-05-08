@@ -1,18 +1,98 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
 
-<BorderPane xmlns="http://javafx.com/javafx/8.0.65" xmlns:fx="http://javafx.com/fxml/1" fx:controller="fr.rg.java.rando.InfoControler">
+<BorderPane xmlns="http://javafx.com/javafx/8.0.111" xmlns:fx="http://javafx.com/fxml/1" fx:controller="fr.rg.java.rando.InfoControler">
 	<center>
 		<Pane fx:id="graph" prefHeight="600.0" prefWidth="800.0" />
 	</center>
 	<bottom>
-		<ProgressBar fx:id="progressBar" prefWidth="800.0" progress="0.0" BorderPane.alignment="CENTER" />
+      <AnchorPane BorderPane.alignment="CENTER">
+         <children>
+      		<ProgressBar fx:id="progressBar" prefWidth="800.0" progress="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" />
+         </children>
+      </AnchorPane>
 	</bottom>
 	<padding>
 		<Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
 	</padding>
+	<right>
+		<VBox prefHeight="200.0" prefWidth="100.0" BorderPane.alignment="CENTER">
+			<children>
+				<Label contentDisplay="CENTER" text="Capteur">
+					<VBox.margin>
+						<Insets top="10.0" />
+					</VBox.margin>
+               <font>
+                  <Font size="19.0" />
+               </font>
+				</Label>
+            <Label text="distance">
+               <font>
+                  <Font size="10.0" />
+               </font>
+            </Label>
+				<TextField fx:id="distanceTF" disable="true" editable="false">
+               <font>
+                  <Font size="12.0" />
+               </font></TextField>
+				<Label text="Altitude min">
+               <VBox.margin>
+                  <Insets top="5.0" />
+               </VBox.margin>
+               <font>
+                  <Font size="10.0" />
+               </font></Label>
+				<TextField fx:id="altMinTF" disable="true" editable="false" />
+				<Label text="Altitude max">
+               <VBox.margin>
+                  <Insets top="5.0" />
+               </VBox.margin>
+               <font>
+                  <Font size="10.0" />
+               </font></Label>
+				<TextField fx:id="altMaxTF" disable="true" editable="false" />
+				<Label text="Dénivelé positif">
+               <VBox.margin>
+                  <Insets top="5.0" />
+               </VBox.margin>
+               <font>
+                  <Font size="10.0" />
+               </font></Label>
+				<TextField fx:id="denivPosTF" disable="true" editable="false" />
+				<Label text="Dénivelé négatif">
+               <VBox.margin>
+                  <Insets top="5.0" />
+               </VBox.margin>
+               <font>
+                  <Font size="10.0" />
+               </font></Label>
+				<TextField fx:id="denivNegTF" disable="true" editable="false" />
+				<Label text="Durée totale">
+               <VBox.margin>
+                  <Insets top="5.0" />
+               </VBox.margin>
+               <font>
+                  <Font size="10.0" />
+               </font></Label>
+				<TextField fx:id="dureeTotTF" disable="true" editable="false" />
+				<Label text="Durée sans pause">
+               <VBox.margin>
+                  <Insets top="5.0" />
+               </VBox.margin>
+               <font>
+                  <Font size="10.0" />
+               </font></Label>
+				<TextField fx:id="dureeSansPauseTF" disable="true" editable="false" />
+			</children>
+		</VBox>
+	</right>
 </BorderPane>
