@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
@@ -15,7 +14,6 @@
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.Pane?>
-<?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx/8.0.111"
 	xmlns:fx="http://javafx.com/fxml/1" fx:controller="fr.rg.java.rando.IGNMapController">
@@ -35,14 +33,6 @@
 							text="Adresse...">
 							<accelerator>
 								<KeyCodeCombination alt="ANY" code="A"
-									control="UP" meta="UP" shift="UP" shortcut="UP" />
-							</accelerator>
-						</MenuItem>
-						<SeparatorMenuItem mnemonicParsing="false" />
-						<MenuItem mnemonicParsing="false" onAction="#showPeers"
-							text="Réseau...">
-							<accelerator>
-								<KeyCodeCombination alt="ANY" code="R"
 									control="UP" meta="UP" shift="UP" shortcut="UP" />
 							</accelerator>
 						</MenuItem>
@@ -90,6 +80,18 @@
 									control="ANY" meta="UP" shift="UP" shortcut="UP" />
 							</accelerator>
 						</MenuItem>
+					</items>
+				</Menu>
+				<Menu mnemonicParsing="false" text="Fenêtres">
+					<items>
+						<RadioMenuItem mnemonicParsing="false" text="Info Trace" />
+						<RadioMenuItem mnemonicParsing="false" onAction="#showPeers"
+							text="Pairs">
+							<accelerator>
+								<KeyCodeCombination alt="ANY" code="R"
+									control="UP" meta="UP" shift="UP" shortcut="UP" />
+							</accelerator>
+						</RadioMenuItem>
 					</items>
 				</Menu>
 				<Menu mnemonicParsing="false" text="Configuration">

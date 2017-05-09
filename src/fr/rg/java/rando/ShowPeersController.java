@@ -30,7 +30,6 @@ public class ShowPeersController {
 	@FXML
 	TextArea infoTA;
 
-	Stage peerStage;
 	String netMsg = "";
 	Socket commSocket;
 	BufferedReader netIn;
@@ -40,13 +39,10 @@ public class ShowPeersController {
 	// Préférences utilisateur
 	Preferences prefs = Preferences.userNodeForPackage(Main.class);
 
-	/**
-	 * Fenêtre où afficher les informations.
-	 *
-	 * @param stage
-	 */
-	void setPeerStage(Stage stage) {
-		peerStage = stage;
+	Main main;
+
+	void setMainInstance(Main m) {
+		main = m;
 	}
 
 	/**
@@ -86,7 +82,7 @@ public class ShowPeersController {
 	 */
 	private void openTCPConnection(String host) {
 		try {
-			commSocket = new Socket(host, IGNMapController.MULTICAST_PORT);
+			commSocket = new Socket(host, Main.MULTICAST_PORT);
 			netIn = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
 			netInB = new BufferedInputStream(commSocket.getInputStream());
 			netOut = new PrintWriter(commSocket.getOutputStream(), true);
@@ -97,24 +93,27 @@ public class ShowPeersController {
 
 	/**
 	 * Finaliser l'initialisation de la fenêtre en surveillant les clics sur les
-	 * items de la liste.
+	 * items des 2 listes.
 	 */
 	@FXML
 	void initialize() {
-		// Gestion du clic sur les listes
+		// Clic sur un pair -> Récupération de ses informations
 		peerLV.setOnMouseClicked((event) -> {
+			System.out.println("Clic sur pair");
 			String host = peerLV.getSelectionModel().getSelectedItem();
 			new Thread(new Task<Void>() {
 
 				@Override
 				protected Void call() throws Exception {
-					connectToPeer(host, peerStage);
+					connectToPeer(host, (Stage) infoTA.getScene().getWindow());
 					return null;
 				}
 			}).start();
 		});
 
+		// Clic sur un fichier KML -> lancement du téléchargement
 		filesLV.setOnMouseClicked((event) -> {
+			System.out.println("Clic");
 			if (event.getClickCount() >= 2) { // Double clic
 				String host = peerLV.getSelectionModel().getSelectedItem();
 				String file = filesLV.getSelectionModel().getSelectedItem();
@@ -123,76 +122,65 @@ public class ShowPeersController {
 
 					@Override
 					protected Void call() throws Exception {
-						downloadFileFromPeer(host, file, peerStage);
+						// Télécharger le fichier depuis le pair
+						String reponse;
+
+						// Connexion au pair
+						try {
+							openTCPConnection(host);
+
+							// Demande du fichier
+							netOut.println("GET FILE");
+							netOut.println(file);
+
+							// Récupérer la taille du fichier
+							reponse = netIn.readLine();
+							int fileSize = Integer.parseInt(reponse);
+
+							// Récupérer les octets du fichier et sauvegarder le fichier
+							byte[] buf = new byte[fileSize];
+							File newFile = new File(prefs.get(Main.KML_DIR_KEY, "/tmp"), file);
+							int bytesRead = netInB.read(buf, 0, fileSize);
+							int current = bytesRead;
+							while (current < fileSize) {
+								bytesRead = netInB.read(buf, current, fileSize - current);
+								if (bytesRead >= 0) {
+									current += bytesRead;
+								}
+							}
+							// Sauver le fichier
+							FileOutputStream fileOut = new FileOutputStream(newFile);
+							fileOut.write(buf, 0, fileSize);
+							fileOut.flush();
+							fileOut.close();
+
+							reponse = netIn.readLine(); // END
+							netOut.println("QUIT");
+
+							closeTCPConnection();
+
+							// Supprimer de la liste des nouveaux fichiers et ouvrir la trace
+							// sur la carte
+							Platform.runLater(new Runnable() {
+
+								@Override
+								public void run() {
+									// Suppression du fichier de la liste
+									filesLV.getItems().remove(file);
+									// Ouvrir la trace dans l'application
+									main.loadLocalKMLTrack(newFile);
+								}
+							});
+
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+
 						return null;
 					}
 				}).start();
 			}
 		});
-	}
-
-	/**
-	 * Récupérer un fichier (KML) depuis le pair.
-	 *
-	 * @param host
-	 *            Adresse IP du pair
-	 * @param fileName
-	 *            Nom du fichier à récupérer
-	 * @param stage
-	 *            Fenêtre principale
-	 */
-	private void downloadFileFromPeer(String host, String fileName, Stage stage) {
-		String reponse;
-
-		// Connexion au pair
-		try {
-			openTCPConnection(host);
-
-			// Demande du fichier
-			netOut.println("GET FILE");
-			netOut.println(fileName);
-
-			// Récupérer la taille du fichier
-			reponse = netIn.readLine();
-			int fileSize = Integer.parseInt(reponse);
-
-			// Récupérer les octets du fichier et sauvegarder le fichier
-			byte[] buf = new byte[fileSize];
-			File newFile = new File(prefs.get(Main.KML_DIR_KEY, "/tmp"), fileName);
-			int bytesRead = netInB.read(buf, 0, fileSize);
-			int current = bytesRead;
-			while (current < fileSize) {
-				bytesRead = netInB.read(buf, current, fileSize - current);
-				if (bytesRead >= 0) {
-					current += bytesRead;
-				}
-			}
-			// Sauver le fichier
-			FileOutputStream fileOut = new FileOutputStream(newFile);
-			fileOut.write(buf, 0, fileSize);
-			fileOut.flush();
-			fileOut.close();
-
-			reponse = netIn.readLine(); // END
-			netOut.println("QUIT");
-
-			closeTCPConnection();
-
-			// Supprimer de la liste des nouveaux fichiers et ouvrir la trace sur la carte
-			Platform.runLater(new Runnable() {
-
-				@Override
-				public void run() {
-					// Suppression du fichier de la liste
-					filesLV.getItems().remove(fileName);
-
-				}
-			});
-
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
 	}
 
 	/**

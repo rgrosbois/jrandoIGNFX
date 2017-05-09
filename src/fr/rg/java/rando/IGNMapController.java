@@ -2,22 +2,13 @@ package fr.rg.java.rando;
 
 import java.awt.Point;
 import java.awt.Rectangle;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.DatagramPacket;
 import java.net.HttpURLConnection;
-import java.net.InetAddress;
-import java.net.MulticastSocket;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.net.URL;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -29,13 +20,8 @@ import javax.imageio.ImageIO;
 import fr.rg.java.rando.util.GeoLocation;
 import fr.rg.java.rando.util.KMLReader;
 import fr.rg.java.rando.util.WMTS;
-import javafx.application.Platform;
-import javafx.beans.InvalidationListener;
-import javafx.beans.Observable;
-import javafx.beans.binding.Bindings;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
-import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
@@ -43,11 +29,8 @@ import javafx.concurrent.WorkerStateEvent;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
 import javafx.geometry.Point2D;
 import javafx.geometry.Side;
-import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.CustomMenuItem;
 import javafx.scene.control.Label;
@@ -65,11 +48,9 @@ import javafx.scene.image.WritableImage;
 import javafx.scene.image.WritablePixelFormat;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.Line;
 import javafx.scene.shape.Polyline;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
-import javafx.stage.Stage;
 
 public class IGNMapController {
 	static final int TILE_PIXEL_DIM = 256;
@@ -103,24 +84,7 @@ public class IGNMapController {
 	boolean ortho = false;
 	Polyline trace; // trace courante
 
-	Stage infoStage; // fenêtre pour les courbes de dénivelés
-
-	// Communauté réseau
-	static final String MULTICAST_ADDRESS = "224.0.71.75";
-	static final int MULTICAST_PORT = 7175;
-	static final long HELLO_INTERVAL = 2000;
-	static final long DEAD_INTERVAL = 10000;
-	ObservableList<String> peerList = FXCollections.observableArrayList();
-	ObservableList<Long> peerTimeStamp = FXCollections.observableArrayList();
-	BufferedReader netIn;
-	PrintWriter netOut;
-	Socket commSocket;
-	String netMsg = "";
-
-	// Fenêtres
-	Stage mainStage; // Fenêtre principale
-	Stage peerStage; // Fenêtre des pairs
-	ShowPeersController peerController;
+	Main main; // Classe principale
 
 	/**
 	 * Fournir la référence de la fenêtre principale.
@@ -128,30 +92,8 @@ public class IGNMapController {
 	 * @param mStage
 	 *            fenêtre principale
 	 */
-	public void setMainStage(Stage mStage) {
-		mainStage = mStage;
-	}
-
-	public void closeConnections() {
-		try {
-			if (netIn != null) {
-				netIn.close();
-			}
-			if (netOut != null) {
-				netOut.close();
-			}
-			if (commSocket != null) {
-				commSocket.close();
-			}
-			if (peerController != null) {
-				peerController.closeTCPConnection();
-			}
-
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
+	public void setMainInstance(Main m) {
+		main = m;
 	}
 
 	/**
@@ -161,142 +103,6 @@ public class IGNMapController {
 	void initialize() {
 		// Clé IGN
 		cleIGN = prefs.get(Main.IGNKEY_KEY, Main.DEFAULT_IGNKEY); // 19/11/2017
-
-		// +-----------------+
-		// | Services réseau |
-		// +-----------------+
-		// Émettre des balises de présence sur le réseau
-		Task<Void> beaconTask = new Task<Void>() {
-
-			@Override
-			protected Void call() throws Exception {
-				// Configuration de la socket et préparation du paquet à émettre
-				MulticastSocket s = null;
-				String msg = "Hello";
-				byte[] buf = msg.getBytes();
-				DatagramPacket pkt = null;
-				try {
-					pkt = new DatagramPacket(buf, buf.length, InetAddress.getByName(MULTICAST_ADDRESS), MULTICAST_PORT);
-					s = new MulticastSocket();
-					s.setLoopbackMode(true); // Ne pas envoyer sur lo
-				} catch (IOException e1) {
-					e1.printStackTrace();
-				}
-
-				// Émission périodique
-				while (!isCancelled()) {
-					try {
-						s.send(pkt);
-
-						// Purger la liste des pairs
-						Platform.runLater(() -> {
-							long now = System.currentTimeMillis();
-							Iterator<String> it = peerList.iterator();
-							Iterator<Long> it2 = peerTimeStamp.iterator();
-							while (it.hasNext()) {
-								it.next();
-								long time = it2.next();
-								if ((now - time) > DEAD_INTERVAL) {
-									it.remove();
-									it2.remove();
-								}
-							}
-						});
-
-						Thread.sleep(HELLO_INTERVAL);
-					} catch (InterruptedException | IOException e) {
-						e.printStackTrace();
-					}
-				}
-				return null;
-			}
-		};
-		new Thread(beaconTask).start();
-
-		// Écouter les balises émises par les pairs
-		Task<Void> listenTask = new Task<Void>() {
-
-			@Override
-			protected Void call() throws Exception {
-				MulticastSocket s;
-				byte[] buf = new byte[1500];
-				DatagramPacket pkt = new DatagramPacket(buf, buf.length);
-
-				try {
-					// Rejoindre le groupe de multidiffusion
-					s = new MulticastSocket(MULTICAST_PORT);
-					InetAddress group = InetAddress.getByName(MULTICAST_ADDRESS);
-					s.joinGroup(group);
-
-					// Attendre les datagrammes et identifier les expéditeurs
-					while (!isCancelled()) {
-						s.receive(pkt); // attendre un message
-						String peer = pkt.getAddress().getHostAddress();
-						long timeStamp = System.currentTimeMillis();
-
-						Platform.runLater(() -> {
-							if (!peerList.contains(peer)) { // Nouveau pair
-								peerList.add(peer);
-								peerTimeStamp.add(timeStamp);
-							} else { // Pair connu, mettre à jour le timeStamp
-								peerTimeStamp.set(peerList.indexOf(peer), timeStamp);
-							}
-						});
-					}
-
-					// Quitter le groupe de multidiffusion
-					s.leaveGroup(group);
-					s.close();
-				} catch (IOException e) {
-				}
-				return null;
-			}
-		};
-		new Thread(listenTask).start();
-
-		// Serveur TCP
-		Task<Void> tcpServerTask = new Task<Void>() {
-
-			@Override
-			protected Void call() throws Exception {
-				ServerSocket listenSocket = new ServerSocket(MULTICAST_PORT);
-
-				boolean continuer = true;
-				while (continuer) {
-					// Attendre le prochain client et ouvrir les canaux de
-					// communications
-					commSocket = listenSocket.accept();
-
-					netIn = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
-					netOut = new PrintWriter(commSocket.getOutputStream(), true);
-
-					String msg = netIn.readLine();
-					while (msg != null && !msg.equals("QUIT")) {
-						switch (msg) {
-						case "INFO":
-						default:
-							netOut.println("Dépôt KML : " + prefs.get(Main.KML_DIR_KEY, "/tmp"));
-							netOut.println("Clé IGN : " + prefs.get(Main.IGNKEY_KEY, Main.DEFAULT_IGNKEY));
-							netOut.println("Géolocalisation : "
-									+ prefs.getDouble(Main.SAVED_LONGITUDE_KEY, Main.DEFAULT_LONGITUDE) + ", "
-									+ prefs.getDouble(Main.SAVED_LATITUDE_KEY, Main.DEFAULT_LATITUDE));
-							netOut.println("END");
-							break;
-						}
-
-						msg = netIn.readLine();
-					}
-
-					// Fermer les communications
-					netIn.close();
-					netOut.close();
-				}
-				listenSocket.close();
-
-				return null;
-			}
-		};
-		new Thread(tcpServerTask).start();
 
 	}
 
@@ -495,36 +301,6 @@ public class IGNMapController {
 	}
 
 	/**
-	 * Afficher la liste des pairs.
-	 *
-	 * @param e
-	 */
-	@FXML
-	void showPeers(ActionEvent e) {
-		// Boîte de dialogue pour afficher les pairs
-		try {
-			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Show_peers.fxml"));
-			Parent root = loader.load();
-			peerController = (ShowPeersController) loader.getController();
-			Scene scene;
-			scene = new Scene(root);
-
-			if (peerStage == null) {
-				peerStage = new Stage();
-				peerStage.initOwner(mainStage);
-			}
-			peerStage.setScene(scene);
-			peerStage.setTitle("Liste de pairs");
-			peerStage.show();
-			peerController.setPeerStage(peerStage);
-			peerController.setPeerList(peerList);
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
-
-	}
-
-	/**
 	 * Ouvrir une boîte de dialogue pour éditer la clé IGN utilisée par
 	 * l'application.
 	 *
@@ -537,7 +313,7 @@ public class IGNMapController {
 		dialog.setHeaderText("Clé utilisée pour télécharger les tuiles IGN");
 		dialog.setContentText("Clé:");
 		dialog.initModality(Modality.WINDOW_MODAL);
-		dialog.initOwner(mainStage);
+		dialog.initOwner(contentPane.getScene().getWindow());
 
 		// Afficher la boîte de dialogue
 		Optional<String> result = dialog.showAndWait();
@@ -589,7 +365,7 @@ public class IGNMapController {
 		dialog.setHeaderText("Rechercher une adresse");
 		dialog.setContentText("adresse:");
 		dialog.initModality(Modality.WINDOW_MODAL);
-		dialog.initOwner(mainStage);
+		dialog.initOwner(contentPane.getScene().getWindow());
 
 		// Autocomplétion
 		TextField tf = dialog.getEditor();
@@ -693,6 +469,10 @@ public class IGNMapController {
 			ex.printStackTrace();
 		}
 
+		loadLocalKMLTrack(file);
+	}
+
+	void loadLocalKMLTrack(File file) {
 		// Extraction des géolocalisations du fichier KML
 		HashMap<String, Object> infoKML = new KMLReader().extractLocWithStAXCursor(file.getAbsolutePath());
 		ArrayList<GeoLocation> list = (ArrayList<GeoLocation>) infoKML.get(KMLReader.LOCATIONS_KEY);
@@ -718,22 +498,7 @@ public class IGNMapController {
 		}
 
 		// Créer et afficher les courbes de dénivelé
-		if (infoStage == null) { // Réutiliser la fenêtre existante
-			infoStage = new Stage();
-			infoStage.setTitle("Informations");
-		}
-		try {
-			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Info_ihm.fxml"));
-			Parent root = loader.load();
-			Scene scene = new Scene(root);
-			infoStage.setScene(scene);
-			infoStage.show();
-
-			InfoControler ic = loader.getController();
-			ic.setTrace(infoKML);
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
+		main.showTrackInfoWindow(infoKML);
 	}
 
 	/**
@@ -838,6 +603,11 @@ public class IGNMapController {
 			};
 		}
 
+	}
+
+	@FXML
+	void showPeers(ActionEvent e) {
+		main.showPeerWindow();
 	}
 
 }

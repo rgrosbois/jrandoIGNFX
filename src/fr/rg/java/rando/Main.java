@@ -2,8 +2,25 @@ package fr.rg.java.rando;
 
 import java.awt.MouseInfo;
 import java.awt.Point;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
+import java.net.MulticastSocket;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.prefs.Preferences;
 
 import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.event.EventHandler;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Rectangle2D;
@@ -27,40 +44,72 @@ public class Main extends Application {
 	static final double DEFAULT_LONGITUDE = 5.72f;
 	static final String DEFAULT_IGNKEY = "ry9bshqmzmv1gao9srw610oq";
 
+	// Reférences vers les contrôleurs de fenêtres
+	IGNMapController mapController;
+	InfoControler infoController;
+	ShowPeersController peersController;
+
+	// Communauté réseau
+	static final String MULTICAST_ADDRESS = "224.0.71.75";
+	static final int MULTICAST_PORT = 7175;
+	static final long HELLO_INTERVAL = 2000;
+	static final long DEAD_INTERVAL = 10000;
+	ObservableList<String> peerList = FXCollections.observableArrayList();
+	ObservableList<Long> peerTimeStamp = FXCollections.observableArrayList();
+	BufferedReader netIn;
+	PrintWriter netOut;
+	Socket commSocket;
+	String netMsg = "";
+
+	// Préférences utilisateur
+	Preferences prefs = Preferences.userNodeForPackage(Main.class);
+
+	Stage mainStage; // Fenêtre principale
+
+	/**
+	 * Dimensionner et créer la fenêtre principale puis lancer les services
+	 * réseau.
+	 */
 	@Override
 	public void start(Stage primaryStage) {
-		// Identifier la taille de l'écran courant afin de dimensionner
-		// la fenêtre et calculer le nombre de tuiles nécessaire
-		Point p = MouseInfo.getPointerInfo().getLocation();
-		Screen currentScreen = Screen.getPrimary();
-		for (Screen s : Screen.getScreens()) {
+		mainStage = primaryStage;
+
+		// Récupérer la taille de l'écran courant pour dimensionner
+		// la fenêtre et calculer le nombre de tuiles nécessaires
+		Point p = MouseInfo.getPointerInfo().getLocation(); // position de la
+															// souris
+		Screen currentScreen = Screen.getPrimary(); // écran primaire par défaut
+		for (Screen s : Screen.getScreens()) { // chercher l'écran contenant la
+												// souris
 			if (s.getBounds().contains(p.x, p.y)) {
 				currentScreen = s;
 			}
 		}
+		// La fenêtre a des dimensions égales à 13/15 de l'écran courant
 		Rectangle2D screenBounds = currentScreen.getBounds();
-		double width = screenBounds.getWidth();
-		double height = screenBounds.getHeight();
-		int stageWidth = (int) (13 * width / 15);
-		int stageHeight = (int) (13 * height / 15);
-		int numTileX = (int) Math.floor(width / IGNMapController.TILE_PIXEL_DIM);
+		int stageWidth = (int) (13 * screenBounds.getWidth() / 15);
+		int stageHeight = (int) (13 * screenBounds.getHeight() / 15);
+
+		// Nombre impair de tuiles suivant les lignes et les colonnes
+		// et permettant de couvrir 4 fois l'écran
+		int numTileX = (int) Math.floor(screenBounds.getWidth() / IGNMapController.TILE_PIXEL_DIM);
 		numTileX = 2 * numTileX + 1;
-		int numTileY = (int) Math.floor(height / IGNMapController.TILE_PIXEL_DIM);
+		int numTileY = (int) Math.floor(screenBounds.getHeight() / IGNMapController.TILE_PIXEL_DIM);
 		numTileY = 2 * numTileY + 1;
 
 		// Charger la scène et configurer la fenêtre
 		try {
 			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Map_ihm.fxml"));
 			Parent root = loader.load();
-			IGNMapController controleur = ((IGNMapController) loader.getController());
-			controleur.setMainStage(primaryStage);
-			controleur.setTilesNumber(numTileX, numTileY);
+			mapController = ((IGNMapController) loader.getController());
+			mapController.setMainInstance(this);
+			mapController.setTilesNumber(numTileX, numTileY);
 			Scene scene = new Scene(root);
 
 			primaryStage.setScene(scene);
 			primaryStage.setResizable(false);
-			primaryStage.setX(screenBounds.getMinX() + width / 15);
-			primaryStage.setY(screenBounds.getMinY() + height / 15);
+			primaryStage.setX(screenBounds.getMinX() + screenBounds.getWidth() / 15);
+			primaryStage.setY(screenBounds.getMinY() + screenBounds.getHeight() / 15);
 			primaryStage.setWidth(stageWidth);
 			primaryStage.setHeight(stageHeight);
 
@@ -69,7 +118,27 @@ public class Main extends Application {
 
 				@Override
 				public void handle(WindowEvent event) {
-					controleur.closeConnections();
+					// Fermer les connexions réseau
+					try {
+						if (netIn != null) {
+							netIn.close();
+						}
+						if (netOut != null) {
+							netOut.close();
+						}
+						if (commSocket != null) {
+							commSocket.close();
+						}
+
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					// Fermer les connexions réseau sur fenêtre fille
+					if (peersController != null) {
+						peersController.closeTCPConnection();
+					}
+
 					System.exit(0);
 				}
 			});
@@ -77,6 +146,216 @@ public class Main extends Application {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+
+		// +-----------------+
+		// | Services réseau |
+		// +-----------------+
+		// Émettre des balises de présence sur le réseau
+		Task<Void> beaconTask = new Task<Void>() {
+
+			@Override
+			protected Void call() throws Exception {
+				// Configuration de la socket et préparation du paquet à émettre
+				MulticastSocket s = null;
+				String msg = "Hello";
+				byte[] buf = msg.getBytes();
+				DatagramPacket pkt = null;
+				try {
+					pkt = new DatagramPacket(buf, buf.length, InetAddress.getByName(MULTICAST_ADDRESS), MULTICAST_PORT);
+					s = new MulticastSocket();
+					s.setLoopbackMode(true); // Ne pas envoyer sur lo
+				} catch (IOException e1) {
+					e1.printStackTrace();
+				}
+
+				// Émission périodique
+				while (!isCancelled()) {
+					try {
+						s.send(pkt);
+
+						// Purger la liste des pairs
+						Platform.runLater(() -> {
+							long now = System.currentTimeMillis();
+							Iterator<String> it = peerList.iterator();
+							Iterator<Long> it2 = peerTimeStamp.iterator();
+							while (it.hasNext()) {
+								it.next();
+								long time = it2.next();
+								if ((now - time) > DEAD_INTERVAL) {
+									it.remove();
+									it2.remove();
+								}
+							}
+						});
+
+						Thread.sleep(HELLO_INTERVAL);
+					} catch (InterruptedException | IOException e) {
+						if (!isCancelled()) {
+							e.printStackTrace();
+						}
+					}
+				}
+				return null;
+			}
+		};
+		new Thread(beaconTask).start();
+
+		// Écouter les balises émises par les pairs
+		Task<Void> listenTask = new Task<Void>() {
+
+			@Override
+			protected Void call() throws Exception {
+				MulticastSocket s;
+				byte[] buf = new byte[1500];
+				DatagramPacket pkt = new DatagramPacket(buf, buf.length);
+
+				try {
+					// Rejoindre le groupe de multidiffusion
+					s = new MulticastSocket(MULTICAST_PORT);
+					InetAddress group = InetAddress.getByName(MULTICAST_ADDRESS);
+					s.joinGroup(group);
+
+					// Attendre les datagrammes et identifier les expéditeurs
+					while (!isCancelled()) {
+						s.receive(pkt); // attendre un message
+						String peer = pkt.getAddress().getHostAddress();
+						long timeStamp = System.currentTimeMillis();
+
+						Platform.runLater(() -> {
+							if (!peerList.contains(peer)) { // Nouveau pair
+								peerList.add(peer);
+								peerTimeStamp.add(timeStamp);
+							} else { // Pair connu, mettre à jour le timeStamp
+								peerTimeStamp.set(peerList.indexOf(peer), timeStamp);
+							}
+						});
+					}
+
+					// Quitter le groupe de multidiffusion
+					s.leaveGroup(group);
+					s.close();
+				} catch (IOException e) {
+					if (!isCancelled()) {
+						e.printStackTrace();
+					}
+				}
+				return null;
+			}
+		};
+		new Thread(listenTask).start();
+
+		// Serveur TCP
+		Task<Void> tcpServerTask = new Task<Void>() {
+
+			@Override
+			protected Void call() throws Exception {
+				ServerSocket listenSocket = new ServerSocket(MULTICAST_PORT);
+
+				while (!isCancelled()) {
+					// Attendre le prochain client et ouvrir les canaux de
+					// communications
+					commSocket = listenSocket.accept();
+
+					netIn = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
+					netOut = new PrintWriter(commSocket.getOutputStream(), true);
+
+					String msg = netIn.readLine();
+					while (msg != null && !msg.equals("QUIT")) {
+						switch (msg) {
+						case "INFO":
+						default:
+							netOut.println("Dépôt KML : " + prefs.get(Main.KML_DIR_KEY, "/tmp"));
+							netOut.println("Clé IGN : " + prefs.get(Main.IGNKEY_KEY, Main.DEFAULT_IGNKEY));
+							netOut.println("Géolocalisation : "
+									+ prefs.getDouble(Main.SAVED_LONGITUDE_KEY, Main.DEFAULT_LONGITUDE) + ", "
+									+ prefs.getDouble(Main.SAVED_LATITUDE_KEY, Main.DEFAULT_LATITUDE));
+							netOut.println("END");
+							break;
+						}
+
+						msg = netIn.readLine();
+					}
+
+					// Fermer les communications
+					netIn.close();
+					netOut.close();
+				}
+				listenSocket.close();
+
+				return null;
+			}
+		};
+		new Thread(tcpServerTask).start();
+	}
+
+	/**
+	 * Lancer le processus de traitement d'un fichier KML par le contrôleur de
+	 * la carte IGN.
+	 *
+	 * @param file
+	 *            Fichier à traiter
+	 */
+	void loadLocalKMLTrack(File file) {
+		mapController.loadLocalKMLTrack(file);
+	}
+
+	void showPeerWindow() {
+		if (peersController == null) { // Créer la fenêtre
+			// Boîte de dialogue pour afficher les pairs
+			try {
+				FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Show_peers.fxml"));
+				Parent root = loader.load();
+				peersController = (ShowPeersController) loader.getController();
+				peersController.setMainInstance(this);
+				Scene scene;
+				scene = new Scene(root);
+
+				Stage peerStage = new Stage();
+				peerStage.initOwner(mainStage);
+				peerStage.setScene(scene);
+				peerStage.setTitle("Liste de pairs");
+				peerStage.show();
+				peersController.setPeerList(peerList);
+				peerStage.show();
+
+				peerStage.setOnCloseRequest(new EventHandler<WindowEvent>() {
+
+					@Override
+					public void handle(WindowEvent event) {
+						peersController = null;
+					}
+				});
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+		}
+	}
+
+	/**
+	 * Lancer le traitement de la nouvelle trace pour la fenêtre d'affichage des
+	 * statistiques de la trace. Créer et faire apparaître cette fenêtre si
+	 * nécessaire
+	 *
+	 * @param infoKML
+	 */
+	void showTrackInfoWindow(HashMap<String, Object> infoKML) {
+		if (infoController == null) { // Réutiliser la fenêtre existante
+			try {
+				FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Info_ihm.fxml"));
+				Parent root = loader.load();
+				infoController = loader.getController();
+				Scene scene = new Scene(root);
+
+				Stage infoStage = new Stage();
+				infoStage.setTitle("Informations");
+				infoStage.setScene(scene);
+				infoStage.show();
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+
+		}
+		infoController.setTrace(infoKML);
 	}
 
 	public static void main(String[] args) {
