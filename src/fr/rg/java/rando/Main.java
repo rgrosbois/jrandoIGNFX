@@ -12,12 +12,16 @@ import java.net.InetAddress;
 import java.net.MulticastSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.prefs.Preferences;
 
+import fr.rg.java.rando.util.Peer;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.property.ReadOnlyObjectProperty;
+import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -47,19 +51,18 @@ public class Main extends Application {
 	// Reférences vers les contrôleurs de fenêtres
 	IGNMapController mapController;
 	InfoControler infoController;
-	ShowPeersController peersController;
+	PeersController peersController;
 
 	// Communauté réseau
 	static final String MULTICAST_ADDRESS = "224.0.71.75";
 	static final int MULTICAST_PORT = 7175;
 	static final long HELLO_INTERVAL = 2000;
 	static final long DEAD_INTERVAL = 10000;
-	ObservableList<String> peerList = FXCollections.observableArrayList();
-	ObservableList<Long> peerTimeStamp = FXCollections.observableArrayList();
 	BufferedReader netIn;
 	PrintWriter netOut;
 	Socket commSocket;
 	String netMsg = "";
+	final ObservableList<Peer> peerList = FXCollections.observableArrayList();
 
 	// Préférences utilisateur
 	Preferences prefs = Preferences.userNodeForPackage(Main.class);
@@ -174,19 +177,6 @@ public class Main extends Application {
 						s.send(pkt);
 
 						// Purger la liste des pairs
-						Platform.runLater(() -> {
-							long now = System.currentTimeMillis();
-							Iterator<String> it = peerList.iterator();
-							Iterator<Long> it2 = peerTimeStamp.iterator();
-							while (it.hasNext()) {
-								it.next();
-								long time = it2.next();
-								if ((now - time) > DEAD_INTERVAL) {
-									it.remove();
-									it2.remove();
-								}
-							}
-						});
 
 						Thread.sleep(HELLO_INTERVAL);
 					} catch (InterruptedException | IOException e) {
@@ -200,7 +190,8 @@ public class Main extends Application {
 		};
 		new Thread(beaconTask).start();
 
-		// Écouter les balises émises par les pairs
+		// Écouter les balises émises par les pairs tout en mettant à jour
+		// la liste des pairs
 		Task<Void> listenTask = new Task<Void>() {
 
 			@Override
@@ -218,17 +209,24 @@ public class Main extends Application {
 					// Attendre les datagrammes et identifier les expéditeurs
 					while (!isCancelled()) {
 						s.receive(pkt); // attendre un message
-						String peer = pkt.getAddress().getHostAddress();
+						String addresse = pkt.getAddress().getHostAddress();
 						long timeStamp = System.currentTimeMillis();
 
-						Platform.runLater(() -> {
-							if (!peerList.contains(peer)) { // Nouveau pair
-								peerList.add(peer);
-								peerTimeStamp.add(timeStamp);
-							} else { // Pair connu, mettre à jour le timeStamp
-								peerTimeStamp.set(peerList.indexOf(peer), timeStamp);
+						// Ajouter à la liste
+						Platform.runLater(new Runnable() {
+
+							@Override
+							public void run() {
+								Iterator<Peer> it = peerList.iterator();
+								while(it.hasNext()) {
+									if(it.next().getIpAddress().equals(addresse)) {
+										it.remove();
+									}
+								}
+								peerList.add(new Peer(addresse, timeStamp));
 							}
 						});
+
 					}
 
 					// Quitter le groupe de multidiffusion
@@ -303,10 +301,11 @@ public class Main extends Application {
 		if (peersController == null) { // Créer la fenêtre
 			// Boîte de dialogue pour afficher les pairs
 			try {
-				FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Show_peers.fxml"));
+				FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Peers_ihm.fxml"));
 				Parent root = loader.load();
-				peersController = (ShowPeersController) loader.getController();
+				peersController = (PeersController) loader.getController();
 				peersController.setMainInstance(this);
+				peersController.setPeerList(peerList);
 				Scene scene;
 				scene = new Scene(root);
 
@@ -315,7 +314,6 @@ public class Main extends Application {
 				peerStage.setScene(scene);
 				peerStage.setTitle("Liste de pairs");
 				peerStage.show();
-				peersController.setPeerList(peerList);
 				peerStage.show();
 
 				peerStage.setOnCloseRequest(new EventHandler<WindowEvent>() {

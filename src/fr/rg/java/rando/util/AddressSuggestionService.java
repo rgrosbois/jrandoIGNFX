@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package fr.rg.java.rando;
+package fr.rg.java.rando.util;
 
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -22,7 +22,7 @@ import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
-import fr.rg.java.rando.util.GeoLocation;
+import fr.rg.java.rando.IGNMapController;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 
@@ -34,7 +34,7 @@ public class AddressSuggestionService extends Service<ArrayList<GeoLocation>> {
 	String address;
 	int maxResponses;
 
-	AddressSuggestionService(String partialAddress, int maxRep) {
+	public AddressSuggestionService(String partialAddress, int maxRep) {
 		address = partialAddress;
 		maxResponses = maxRep;
 	}

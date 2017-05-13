@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<HBox spacing="5.0" xmlns="http://javafx.com/javafx/8.0.111"
+	xmlns:fx="http://javafx.com/fxml/1" fx:controller="fr.rg.java.rando.PeersController">
+	<children>
+		<VBox>
+			<children>
+				<Label text="Pairs :" />
+				<TableView fx:id="pairTV" prefHeight="200.0" prefWidth="200.0">
+					<columns>
+						<TableColumn fx:id="colonneAdresse" prefWidth="75.0"
+							text="Pair" />
+						<TableColumn fx:id="colonneTemps" prefWidth="75.0"
+							text="Détection" />
+					</columns>
+					<columnResizePolicy>
+						<TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+					</columnResizePolicy>
+				</TableView>
+				<Label text="Info :" />
+				<TextArea fx:id="infoTA" prefHeight="200.0" prefWidth="200.0" />
+			</children>
+		</VBox>
+		<VBox>
+			<children>
+				<Label text="Nouveaux fichiers :" />
+				<ListView fx:id="filesLV" prefWidth="200.0" />
+			</children>
+		</VBox>
+	</children>
+	<padding>
+		<Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+	</padding>
+</HBox>

@@ -9,27 +9,40 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.prefs.Preferences;
 
+import fr.rg.java.rando.util.Peer;
 import javafx.application.Platform;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.ListView;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.stage.Stage;
 
-public class ShowPeersController {
-	@FXML
-	ListView<String> peerLV;
-
+public class PeersController {
 	@FXML
 	ListView<String> filesLV;
 
 	@FXML
+	TableView<Peer> pairTV;
+
+	@FXML
+	TableColumn<Peer, String> colonneAdresse;
+
+	@FXML
+	TableColumn<Peer, String> colonneTemps;
+
+	@FXML
 	TextArea infoTA;
 
+	String lastHostIP = "";
 	String netMsg = "";
 	Socket commSocket;
 	BufferedReader netIn;
@@ -50,8 +63,8 @@ public class ShowPeersController {
 	 *
 	 * @param peerList
 	 */
-	void setPeerList(ObservableList<String> peerList) {
-		peerLV.setItems(peerList);
+	void setPeerList(ObservableList<Peer> peerList) {
+		pairTV.setItems(peerList);
 	}
 
 	/**
@@ -97,25 +110,32 @@ public class ShowPeersController {
 	 */
 	@FXML
 	void initialize() {
-		// Clic sur un pair -> Récupération de ses informations
-		peerLV.setOnMouseClicked((event) -> {
-			System.out.println("Clic sur pair");
-			String host = peerLV.getSelectionModel().getSelectedItem();
-			new Thread(new Task<Void>() {
+		// Finaliser l'initialisation du tableau
+		colonneAdresse.setCellValueFactory(new PropertyValueFactory<>("ipAddress"));
+		colonneTemps.setCellValueFactory((p) -> {
+			return new SimpleStringProperty(Peer.df.format(new Date(p.getValue().getTimeStamp())));
+		});
 
-				@Override
-				protected Void call() throws Exception {
-					connectToPeer(host, (Stage) infoTA.getScene().getWindow());
-					return null;
-				}
-			}).start();
+		// Clic sur un pair -> Récupération de ses informations
+		pairTV.setOnMouseClicked((event) -> {
+			if (event.getClickCount() >= 2) { // Double clic
+				lastHostIP = pairTV.getSelectionModel().getSelectedItem().getIpAddress();
+				new Thread(new Task<Void>() {
+
+					@Override
+					protected Void call() throws Exception {
+						connectToPeer(lastHostIP, (Stage) infoTA.getScene().getWindow());
+						return null;
+					}
+				}).start();
+			}
 		});
 
 		// Clic sur un fichier KML -> lancement du téléchargement
 		filesLV.setOnMouseClicked((event) -> {
-			System.out.println("Clic");
 			if (event.getClickCount() >= 2) { // Double clic
-				String host = peerLV.getSelectionModel().getSelectedItem();
+				Peer p = pairTV.getSelectionModel().getSelectedItem();
+				String host = (p==null) ? lastHostIP : p.getIpAddress();
 				String file = filesLV.getSelectionModel().getSelectedItem();
 
 				new Thread(new Task<Void>() {
@@ -137,7 +157,8 @@ public class ShowPeersController {
 							reponse = netIn.readLine();
 							int fileSize = Integer.parseInt(reponse);
 
-							// Récupérer les octets du fichier et sauvegarder le fichier
+							// Récupérer les octets du fichier et sauvegarder le
+							// fichier
 							byte[] buf = new byte[fileSize];
 							File newFile = new File(prefs.get(Main.KML_DIR_KEY, "/tmp"), file);
 							int bytesRead = netInB.read(buf, 0, fileSize);
@@ -159,7 +180,8 @@ public class ShowPeersController {
 
 							closeTCPConnection();
 
-							// Supprimer de la liste des nouveaux fichiers et ouvrir la trace
+							// Supprimer de la liste des nouveaux fichiers et
+							// ouvrir la trace
 							// sur la carte
 							Platform.runLater(new Runnable() {
 

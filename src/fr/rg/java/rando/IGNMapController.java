@@ -17,6 +17,7 @@ import java.util.prefs.Preferences;
 
 import javax.imageio.ImageIO;
 
+import fr.rg.java.rando.util.AddressSuggestionService;
 import fr.rg.java.rando.util.GeoLocation;
 import fr.rg.java.rando.util.KMLReader;
 import fr.rg.java.rando.util.WMTS;
@@ -54,7 +55,7 @@ import javafx.stage.Modality;
 
 public class IGNMapController {
 	static final int TILE_PIXEL_DIM = 256;
-	static String cleIGN;
+	public static String cleIGN;
 
 	// Préférences utilisateur
 	Preferences prefs = Preferences.userNodeForPackage(Main.class);
