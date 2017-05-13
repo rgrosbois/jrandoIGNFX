@@ -261,15 +261,16 @@ public class Main extends Application {
 					while (msg != null && !msg.equals("QUIT")) {
 						switch (msg) {
 						case "INFO":
-						default:
 							netOut.println("Dépôt KML : " + prefs.get(Main.KML_DIR_KEY, "/tmp"));
 							netOut.println("Clé IGN : " + prefs.get(Main.IGNKEY_KEY, Main.DEFAULT_IGNKEY));
 							netOut.println("Géolocalisation : "
 									+ prefs.getDouble(Main.SAVED_LONGITUDE_KEY, Main.DEFAULT_LONGITUDE) + ", "
 									+ prefs.getDouble(Main.SAVED_LATITUDE_KEY, Main.DEFAULT_LATITUDE));
-							netOut.println("END");
 							break;
+						default:
+							netOut.println(msg + " non supporté");
 						}
+						netOut.println("END");
 
 						msg = netIn.readLine();
 					}
