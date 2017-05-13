@@ -2,8 +2,11 @@ package fr.rg.java.rando;
 
 import java.awt.MouseInfo;
 import java.awt.Point;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -12,7 +15,6 @@ import java.net.InetAddress;
 import java.net.MulticastSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.prefs.Preferences;
@@ -20,8 +22,6 @@ import java.util.prefs.Preferences;
 import fr.rg.java.rando.util.Peer;
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.beans.property.ReadOnlyObjectProperty;
-import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -218,8 +218,8 @@ public class Main extends Application {
 							@Override
 							public void run() {
 								Iterator<Peer> it = peerList.iterator();
-								while(it.hasNext()) {
-									if(it.next().getIpAddress().equals(addresse)) {
+								while (it.hasNext()) {
+									if (it.next().getIpAddress().equals(addresse)) {
 										it.remove();
 									}
 								}
@@ -256,6 +256,7 @@ public class Main extends Application {
 
 					netIn = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
 					netOut = new PrintWriter(commSocket.getOutputStream(), true);
+					BufferedOutputStream netOutB = new BufferedOutputStream(commSocket.getOutputStream());
 
 					String msg = netIn.readLine();
 					while (msg != null && !msg.equals("QUIT")) {
@@ -267,8 +268,33 @@ public class Main extends Application {
 									+ prefs.getDouble(Main.SAVED_LONGITUDE_KEY, Main.DEFAULT_LONGITUDE) + ", "
 									+ prefs.getDouble(Main.SAVED_LATITUDE_KEY, Main.DEFAULT_LATITUDE));
 							break;
+						case "FILES":
+							File curDir = new File(prefs.get(Main.KML_DIR_KEY, "/tmp"));
+							for (File file : curDir.listFiles()) {
+								netOut.println(file.getName());
+							}
+							break;
+						case "GET_FILE":
+							msg = netIn.readLine(); // nom du fichier
+							File file = new File(prefs.get(Main.KML_DIR_KEY, "/tmp"), msg);
+							if (file.exists()) {
+								// Envoyer la taille du fichier
+								int len = (int)file.length();
+								netOut.println("" + len);
+								// Envoyer le fichier
+								BufferedInputStream inFile = new BufferedInputStream(new FileInputStream(file));
+                                byte[] buf = new byte[len];
+                                inFile.read(buf, 0, len);
+                                netOutB.write(buf, 0, len);
+                                netOutB.flush();
+                                inFile.close();
+							} else {
+								netOut.println("" + 0); // longueur nulle
+							}
+							break;
 						default:
 							netOut.println(msg + " non supporté");
+							break;
 						}
 						netOut.println("END");
 
