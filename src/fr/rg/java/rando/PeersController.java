@@ -9,12 +9,10 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.prefs.Preferences;
 
 import fr.rg.java.rando.util.Peer;
 import javafx.application.Platform;
-import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -37,7 +35,7 @@ public class PeersController {
 	TableColumn<Peer, String> colonneAdresse;
 
 	@FXML
-	TableColumn<Peer, String> colonneTemps;
+	TableColumn<Peer, Integer> colonneTTL;
 
 	@FXML
 	TextArea infoTA;
@@ -95,7 +93,7 @@ public class PeersController {
 	 */
 	private void openTCPConnection(String host) {
 		try {
-			commSocket = new Socket(host, Main.MULTICAST_PORT);
+			commSocket = new Socket(host, Peer.MULTICAST_PORT);
 			netIn = new BufferedReader(new InputStreamReader(commSocket.getInputStream()));
 			netInB = new BufferedInputStream(commSocket.getInputStream());
 			netOut = new PrintWriter(commSocket.getOutputStream(), true);
@@ -112,9 +110,7 @@ public class PeersController {
 	void initialize() {
 		// Finaliser l'initialisation du tableau
 		colonneAdresse.setCellValueFactory(new PropertyValueFactory<>("ipAddress"));
-		colonneTemps.setCellValueFactory((p) -> {
-			return new SimpleStringProperty(Peer.df.format(new Date(p.getValue().getTimeStamp())));
-		});
+		colonneTTL.setCellValueFactory(new PropertyValueFactory<>("ttl"));
 
 		// Clic sur un pair -> Récupération de ses informations
 		pairTV.setOnMouseClicked((event) -> {

@@ -19,8 +19,7 @@
 					<columns>
 						<TableColumn fx:id="colonneAdresse" prefWidth="75.0"
 							text="Pair" />
-						<TableColumn fx:id="colonneTemps" prefWidth="75.0"
-							text="Détection" />
+						<TableColumn fx:id="colonneTTL" prefWidth="75.0" text="TTL" />
 					</columns>
 					<columnResizePolicy>
 						<TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />

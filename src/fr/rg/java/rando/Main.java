@@ -54,10 +54,6 @@ public class Main extends Application {
 	PeersController peersController;
 
 	// Communauté réseau
-	static final String MULTICAST_ADDRESS = "224.0.71.75";
-	static final int MULTICAST_PORT = 7175;
-	static final long HELLO_INTERVAL = 2000;
-	static final long DEAD_INTERVAL = 10000;
 	BufferedReader netIn;
 	PrintWriter netOut;
 	Socket commSocket;
@@ -164,7 +160,8 @@ public class Main extends Application {
 				byte[] buf = msg.getBytes();
 				DatagramPacket pkt = null;
 				try {
-					pkt = new DatagramPacket(buf, buf.length, InetAddress.getByName(MULTICAST_ADDRESS), MULTICAST_PORT);
+					pkt = new DatagramPacket(buf, buf.length, InetAddress.getByName(Peer.MULTICAST_ADDRESS),
+							Peer.MULTICAST_PORT);
 					s = new MulticastSocket();
 					s.setLoopbackMode(true); // Ne pas envoyer sur lo
 				} catch (IOException e1) {
@@ -177,8 +174,26 @@ public class Main extends Application {
 						s.send(pkt);
 
 						// Purger la liste des pairs
+						Platform.runLater(new Runnable() {
 
-						Thread.sleep(HELLO_INTERVAL);
+							@Override
+							public void run() {
+								long instant = System.currentTimeMillis();
+								Iterator<Peer> it = peerList.iterator();
+								while (it.hasNext()) {
+									Peer peer = it.next();
+									int ttl = (int) ((Peer.DEAD_INTERVAL - (instant - peer.getTimeStamp())) / 1000);
+									System.out.println("  ttl=" + ttl);
+									if (ttl > 0) {
+										peer.setTtl(ttl);
+									} else {
+										it.remove();
+									}
+								}
+							}
+						});
+
+						Thread.sleep(Peer.HELLO_INTERVAL);
 					} catch (InterruptedException | IOException e) {
 						if (!isCancelled()) {
 							e.printStackTrace();
@@ -202,8 +217,8 @@ public class Main extends Application {
 
 				try {
 					// Rejoindre le groupe de multidiffusion
-					s = new MulticastSocket(MULTICAST_PORT);
-					InetAddress group = InetAddress.getByName(MULTICAST_ADDRESS);
+					s = new MulticastSocket(Peer.MULTICAST_PORT);
+					InetAddress group = InetAddress.getByName(Peer.MULTICAST_ADDRESS);
 					s.joinGroup(group);
 
 					// Attendre les datagrammes et identifier les expéditeurs
@@ -211,8 +226,9 @@ public class Main extends Application {
 						s.receive(pkt); // attendre un message
 						String addresse = pkt.getAddress().getHostAddress();
 						long timeStamp = System.currentTimeMillis();
+						System.out.println("- Réception balise");
 
-						// Ajouter à la liste
+						// Ajouter le pair à la liste (ou la mettre à jour)
 						Platform.runLater(new Runnable() {
 
 							@Override
@@ -247,7 +263,7 @@ public class Main extends Application {
 
 			@Override
 			protected Void call() throws Exception {
-				ServerSocket listenSocket = new ServerSocket(MULTICAST_PORT);
+				ServerSocket listenSocket = new ServerSocket(Peer.MULTICAST_PORT);
 
 				while (!isCancelled()) {
 					// Attendre le prochain client et ouvrir les canaux de
@@ -279,15 +295,15 @@ public class Main extends Application {
 							File file = new File(prefs.get(Main.KML_DIR_KEY, "/tmp"), msg);
 							if (file.exists()) {
 								// Envoyer la taille du fichier
-								int len = (int)file.length();
+								int len = (int) file.length();
 								netOut.println("" + len);
 								// Envoyer le fichier
 								BufferedInputStream inFile = new BufferedInputStream(new FileInputStream(file));
-                                byte[] buf = new byte[len];
-                                inFile.read(buf, 0, len);
-                                netOutB.write(buf, 0, len);
-                                netOutB.flush();
-                                inFile.close();
+								byte[] buf = new byte[len];
+								inFile.read(buf, 0, len);
+								netOutB.write(buf, 0, len);
+								netOutB.flush();
+								inFile.close();
 							} else {
 								netOut.println("" + 0); // longueur nulle
 							}
