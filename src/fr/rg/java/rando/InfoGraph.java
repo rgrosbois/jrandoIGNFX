@@ -6,73 +6,104 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.StringTokenizer;
+import java.util.prefs.Preferences;
 
 import fr.rg.java.rando.util.GeoLocation;
-import fr.rg.java.rando.util.KMLReader;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
-import javafx.fxml.FXML;
+import javafx.geometry.Insets;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
+import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
-import javafx.scene.control.TextField;
-import javafx.scene.layout.Pane;
+import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.scene.text.Font;
 
-public class InfoControler {
-	@FXML
-	Pane graph;
-
-	@FXML
-	ProgressBar progressBar;
-
-	@FXML
-	TextField distanceTF;
-
-	@FXML
-	TextField altMinTF;
-
-	@FXML
-	TextField altMaxTF;
-
-	@FXML
-	TextField denivPosTF;
-
-	@FXML
-	TextField denivNegTF;
-
-	@FXML
-	TextField dureeTotTF;
-
-	@FXML
-	TextField dureeSansPauseTF;
-
-	final int nbLocInQuery = 50;
+public class InfoGraph extends BorderPane {
 
 	static final float SEUIL_VITESSE = 1.5f; // en km/h (calcul des pauses)
 	static final float MIN_DELTA_ALT = 10f; // en m (lissage des altitudes)
 	static final float MAX_DELTA_ALT = 50f; // en m (lissage des altitudes)
 
-	void setTrace(HashMap<String, Object> bundle) {
-		// Création des axes
+	LineChart<Number, Number> lineChart;
+	ProgressBar progressBar;
+	Label altMinTF, altMaxTF, denivPosTF, denivNegTF, dureeTotTF, dureeSansPauseTF, distanceTF;
+
+	public InfoGraph() {
+		// Création du graphe
 		NumberAxis xAxis = new NumberAxis();
 		xAxis.setLabel("Distance [km]");
 		NumberAxis yAxis = new NumberAxis();
 		yAxis.setLabel("Altitude [m]");
-
-		// Création du graphe
-		LineChart<Number, Number> lineChart = new LineChart<>(xAxis, yAxis);
-		lineChart.setTitle((String) bundle.get(KMLReader.PATHNAME_KEY));
-		ArrayList<GeoLocation> list = (ArrayList<GeoLocation>) bundle.get(KMLReader.LOCATIONS_KEY);
-		lineChart.setPrefWidth(750);
-		lineChart.setPrefHeight(550);
+		lineChart = new LineChart<>(xAxis, yAxis);
 		lineChart.setCreateSymbols(false);
-		graph.getChildren().clear();
-		graph.getChildren().add(lineChart);
+		lineChart.setMinHeight(100);
+		lineChart.setPrefHeight(200);
+		lineChart.setMaxHeight(300);
+		AnchorPane.setLeftAnchor(lineChart, 0.0);
+		AnchorPane.setRightAnchor(lineChart, 0.0);
+		AnchorPane ap = new AnchorPane(lineChart);
+		setCenter(ap);
 
+		// Statistiques
+		Font fl = new Font(8);
+		Font fh = new Font(12);
+		// Altitudes
+		Label lAltMin = new Label("Altitude min");
+		lAltMin.setFont(fl);
+		altMinTF = new Label("-");
+		altMinTF.setFont(fh);
+		Label lAltMax = new Label("Altitude max");
+		lAltMax.setFont(fl);
+		altMaxTF = new Label("-");
+		altMaxTF.setFont(fh);
+		Label lDenivPos = new Label("Dénivelé pos");
+		lDenivPos.setFont(fl);
+		denivPosTF = new Label("-");
+		denivPosTF.setFont(fh);
+		Label lDenivNeg = new Label("Dénivelé neg");
+		lDenivNeg.setFont(fl);
+		denivNegTF = new Label("-");
+		denivNegTF.setFont(fh);
+		Label lDureeTot = new Label("Durée totale");
+		lDureeTot.setFont(fl);
+		dureeTotTF = new Label("-");
+		dureeTotTF.setFont(fh);
+		Label lDureeSP = new Label("sans pause");
+		lDureeSP.setFont(fl);
+		dureeSansPauseTF = new Label("-");
+		dureeSansPauseTF.setFont(fh);
+		Label lDist = new Label("Distance");
+		lDist.setFont(fl);
+		distanceTF = new Label("-");
+		distanceTF.setFont(fh);
+
+		VBox v1 = new VBox(lAltMin, altMinTF, lDenivPos, denivPosTF, lDureeTot, dureeTotTF, lDist, distanceTF);
+		VBox v2 = new VBox(lAltMax, altMaxTF, lDenivNeg, denivNegTF, lDureeSP, dureeSansPauseTF);
+		HBox h = new HBox(v1, v2);
+		h.setSpacing(5);
+		h.setPadding(new Insets(5));
+		setRight(h);
+
+		// Ajouter un indicateur de progression
+		progressBar = new ProgressBar();
+		progressBar.setMinHeight(2);
+		progressBar.setPrefHeight(10);
+		progressBar.setMaxHeight(20);
+		progressBar.setProgress(0);
+		AnchorPane aPane = new AnchorPane(progressBar);
+		AnchorPane.setLeftAnchor(progressBar, 0.0);
+		AnchorPane.setRightAnchor(progressBar, 0.0);
+		setBottom(aPane);
+	}
+
+	public void setTrack(ArrayList<GeoLocation> list) {
 		// Données issues du capteur
 		XYChart.Series<Number, Number> serieGPS = new XYChart.Series<>();
 		XYChart.Series<Number, Number> serieModel = new XYChart.Series<>();
@@ -83,12 +114,20 @@ public class InfoControler {
 		GeoLocation lastLoc = null;
 		float denivPos = 0;
 		float denivNeg = 0;
+		float altMin = Float.POSITIVE_INFINITY;
+		float altMax = Float.NEGATIVE_INFINITY;
 		boolean pauseDetectee = false;
 		long debutPause = 0; // Instant de départ de la pause
 		long dureePause = 0; // Durée de la pause
 		float deltaElev;
 		for (GeoLocation loc : list) {
 			loc.dispElevation = loc.kmlElevation;
+			if(loc.dispElevation > altMax) {
+				altMax = loc.dispElevation;
+			}
+			if(loc.dispElevation < altMin) {
+				altMin = loc.dispElevation;
+			}
 
 			if (lastLoc != null) {
 				// Lisser l'altitude
@@ -134,8 +173,8 @@ public class InfoControler {
 		els.start();
 
 		// Afficher les statistiques du parcours
-		altMinTF.setText((int) bundle.get(KMLReader.ALT_MIN_KEY) + " m");
-		altMaxTF.setText((int) bundle.get(KMLReader.ALT_MAX_KEY) + " m");
+		altMinTF.setText((int) altMin + " m");
+		altMaxTF.setText((int) altMax + " m");
 		if (lastLoc != null) {
 			distanceTF.setText(dist2String(lastLoc.length));
 			denivPosTF.setText(dist2String(denivPos));
@@ -176,6 +215,7 @@ public class InfoControler {
 					if (len == 0)
 						return null;
 					int j;
+					final int nbLocInQuery = 50;
 					double[] latitude = new double[nbLocInQuery];
 					double[] longitude = new double[nbLocInQuery];
 					int[] elevation = new int[nbLocInQuery];
@@ -233,7 +273,8 @@ public class InfoControler {
 		BufferedReader in;
 
 		// Récupérer la clé IGN
-		String cleIGN = IGNMapController.cleIGN;
+		Preferences prefs = Preferences.userNodeForPackage(Main.class);
+		String cleIGN = prefs.get(Main.IGNKEY_KEY, IGNMap.DEFAULT_IGNKEY);
 
 		urlString = "http://gpp3-wxs.ign.fr/" + cleIGN + "/alti/rest/elevation.json?lat=" + latitude[0];
 		for (int j = 1; j < nbLoc; j++) {
@@ -308,5 +349,4 @@ public class InfoControler {
 		}
 		return s;
 	}
-
 }

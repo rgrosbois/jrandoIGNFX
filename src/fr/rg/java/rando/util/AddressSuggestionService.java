@@ -22,7 +22,7 @@ import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
-import fr.rg.java.rando.IGNMapController;
+import fr.rg.java.rando.IGNMap;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 
@@ -62,7 +62,7 @@ public class AddressSuggestionService extends Service<ArrayList<GeoLocation>> {
 				Document dom;
 
 				// Récupérer la clé IGN
-				final String cleIGN = IGNMapController.cleIGN;
+				final String cleIGN = IGNMap.cleIGN;
 
 				// Récupérer la clé IGN
 				String content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + "<XLS\n"

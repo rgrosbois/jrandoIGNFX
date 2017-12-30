@@ -74,7 +74,7 @@ public class WMTS {
 	 * Calculer la latitude et la longitude d'une position WMTS.
 	 *
 	 * @param p
-	 *            abscisse et ordonnée WMTS (en mètres)
+	 *            coordonnées WMTS (en mètres)
 	 * @return longitude (x) et latitude (y) de la position.
 	 */
 	public static GeoLocation getGeolocation(Point2D p) {

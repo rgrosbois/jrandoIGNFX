@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.BorderPane?>
+<?import fr.rg.java.rando.IGNMap?>
+<?import javafx.geometry.Insets?>
+<?import fr.rg.java.rando.InfoGraph?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.image.Image?>
+
+<BorderPane xmlns="http://javafx.com/javafx/8.0.111"
+	xmlns:fx="http://javafx.com/fxml/1" fx:controller="fr.rg.java.rando.MainController"
+	stylesheets="res/styles.css" id="root">
+	<top>
+		<HBox id="menu" spacing="10">
+			<padding>
+				<Insets left="10" right="10" top="10" bottom="5" />
+			</padding>
+			<Button onAction="#addTrack">
+				<graphic>
+					<ImageView fitWidth="64" fitHeight="64">
+						<image>
+							<Image url="@Add_track.png" />
+						</image>
+					</ImageView>
+				</graphic>
+			</Button>
+			<Button onAction="#openAddress">
+				<graphic>
+					<ImageView fitWidth="64" fitHeight="64">
+						<image>
+							<Image url="@Open_Address.png" />
+						</image>
+					</ImageView>
+				</graphic>
+			</Button>
+		</HBox>
+	</top>
+	<center>
+		<VBox>
+			<padding>
+				<Insets left="10" right="10" top="5" bottom="10" />
+			</padding>
+			<IGNMap fx:id="map" />
+			<InfoGraph fx:id="graph" />
+		</VBox>
+	</center>
+</BorderPane>
