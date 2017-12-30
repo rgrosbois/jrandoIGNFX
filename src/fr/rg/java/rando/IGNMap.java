@@ -96,7 +96,7 @@ public class IGNMap extends BorderPane {
 
 		// Boutons de contrôle
 		wmtsGridBtn = new ToggleButton();
-		ImageView iv = new ImageView(new Image(getClass().getResourceAsStream("/res/Grid.png")));
+		ImageView iv = new ImageView(new Image(getClass().getResourceAsStream("/res/img/Grid.png")));
 		iv.setFitWidth(16);
 		iv.setFitHeight(16);
 		wmtsGridBtn.setGraphic(iv);

@@ -23,7 +23,7 @@
 				<graphic>
 					<ImageView fitWidth="64" fitHeight="64">
 						<image>
-							<Image url="@Add_track.png" />
+							<Image url="@img/Add_track.png" />
 						</image>
 					</ImageView>
 				</graphic>
@@ -32,7 +32,7 @@
 				<graphic>
 					<ImageView fitWidth="64" fitHeight="64">
 						<image>
-							<Image url="@Open_Address.png" />
+							<Image url="@img/Open_Address.png" />
 						</image>
 					</ImageView>
 				</graphic>

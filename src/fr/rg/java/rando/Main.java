@@ -29,7 +29,7 @@ public class Main extends Application {
 	Stage mainStage; // Fenêtre principale
 
 	/**
-	 * Dimensionner et créer la fenêtre principale puis lancer les services réseau.
+	 * Dimensionner et créer la fenêtre principale.
 	 */
 	@Override
 	public void start(Stage primaryStage) {
