@@ -1,0 +1,19 @@
+#statContainer {
+	-fx-spacing: 5.0;
+	-fx-padding: 5.0;
+}
+
+.fieldName {
+  -fx-font-size: 8.0;
+}
+
+.fieldContent {
+  -fx-font-size: 10.0;
+  -fx-padding: 0.0 0.0 5.0 0.0;
+}
+
+.elevationType {
+	-fx-font-size: 10.0;
+	-fx-spacing: 3.0;
+	-fx-padding: 5;
+}

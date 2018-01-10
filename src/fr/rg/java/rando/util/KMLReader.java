@@ -88,7 +88,6 @@ import javax.xml.stream.events.XMLEvent;
  */
 public class KMLReader {
 
-  public static final double RAYON_TERRE = 6_370_000; // 6'370 km
   // Tags du fichier KML
   private static final String KML_PLACEMARK = "Placemark";
   private static final String KML_WHEN = "when";
@@ -264,7 +263,6 @@ public class KMLReader {
               StringTokenizer st = new StringTokenizer(sb.toString());
               while (st.hasMoreTokens()) {
                 key = st.nextToken();
-//                System.out.println("key="+key);
 
                 // Gestion des collisions (points avec mêmes géolocalisations)
                 nbCollision = 0;
@@ -282,7 +280,7 @@ public class KMLReader {
                     GeoLocation lastLocation = list.get(list.size() - 1);
 
                     // Distance cumulative version perso
-                    cumulDist += computeDistance(g, lastLocation);
+                    cumulDist += g.distance(lastLocation);
                     g.length = (int) cumulDist;
 
                     // Vitesse v=dx/dt
@@ -292,10 +290,6 @@ public class KMLReader {
                     } else { // cas où dt=0
                       g.speed = 0;
                     }
-//                    if (g.speed < 0) { // Ne devrait jamais arriver ?
-//                      System.out.println("****" + g.speed + ", comp:" + computeDistance(g, lastLocation));
-//                      g.speed = 0;
-//                    }
                     if (g.speed < vitMin) {
                       vitMin = g.speed;
                     }
@@ -319,6 +313,7 @@ public class KMLReader {
                   g.latitude = Double.parseDouble(coord[1]);
                   if (coord.length >= 3) { // altitude
                     g.kmlElevation = Float.parseFloat(coord[2]);
+                    g.dispElevation = g.kmlElevation;
                   }
                 }
                 if (g.latitude < latMin) {
@@ -340,7 +335,6 @@ public class KMLReader {
                   altMax = g.kmlElevation;
                 }
                 list.add(g);
-//                System.out.println("Geo: " + g);
               }
               g = null;
 
@@ -361,7 +355,6 @@ public class KMLReader {
                         key += "-";
                         nbCollision++;
                       }
-//                      System.out.println("key="+key);
                       points.put(key, g);
                       if (nbCollision > nbCollisionMax) {
                         nbCollisionMax = nbCollision;
@@ -398,31 +391,7 @@ public class KMLReader {
       bundle.put(LOCATIONS_KEY, list); // liste de positions
     }
 
-//    System.out.println("trace de " + list.size() + " positions");
-//    System.out.println(points.size() + " points non affectés");
     return bundle;
   }
 
-  private static double cos(double angledeg) {
-    return Math.cos(Math.toRadians(angledeg));
-  }
-
-  private static double sin(double angledeg) {
-    return Math.sin(Math.toRadians(angledeg));
-  }
-
-  public static double computeDistance(GeoLocation g, GeoLocation lastLocation) {
-    double la = g.latitude;
-    double lb = lastLocation.latitude;
-    double da = g.longitude;
-    double db = lastLocation.longitude;
-    double ha = RAYON_TERRE + g.dispElevation;
-    double hb = RAYON_TERRE + lastLocation.dispElevation;
-    double dist = ha * ha + hb * hb - 2 * ha * hb * (cos(la) * cos(lb) + cos(da - db) * sin(la) * sin(lb));
-    if (dist < 0) { // Cas où erreurs de calcul empêchent de trouver 0
-      return 0;
-    } else {
-      return Math.sqrt(dist);
-    }
-  }
 }

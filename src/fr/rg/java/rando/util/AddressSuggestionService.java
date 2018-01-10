@@ -9,8 +9,11 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.prefs.Preferences;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -22,7 +25,8 @@ import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
-import fr.rg.java.rando.IGNMap;
+import fr.rg.java.rando.IGNMapController;
+import fr.rg.java.rando.Main;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 
@@ -61,8 +65,11 @@ public class AddressSuggestionService extends Service<ArrayList<GeoLocation>> {
 				ArrayList<GeoLocation> loc = new ArrayList<>();
 				Document dom;
 
-				// Récupérer la clé IGN
-				final String cleIGN = IGNMap.cleIGN;
+				// Récupérer les préférences
+				Preferences prefs = Preferences.userNodeForPackage(Main.class);
+				String cleIGN = prefs.get(Main.IGNKEY_KEY, IGNMapController.DEFAULT_IGNKEY);
+				String proxyHostname = prefs.get(Main.PROXY_HOSTNAME_KEY, "");
+				String proxyPortNum = prefs.get(Main.PROXY_PORT_NUMBER_KEY, "0");
 
 				// Récupérer la clé IGN
 				String content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + "<XLS\n"
@@ -78,7 +85,12 @@ public class AddressSuggestionService extends Service<ArrayList<GeoLocation>> {
 				try {
 					// Envoyer la requête
 					url = new URL("http://gpp3-wxs.ign.fr/" + cleIGN + "/geoportail/ols");
-					urlConnection = (HttpURLConnection) url.openConnection();
+					if (!"".equals(proxyHostname)) { // utiliser un proxy
+						urlConnection = (HttpURLConnection) url.openConnection(new Proxy(Proxy.Type.HTTP,
+								new InetSocketAddress(proxyHostname, Integer.parseInt(proxyPortNum))));
+					} else { // Pas de proxy
+						urlConnection = (HttpURLConnection) url.openConnection();
+					}
 					urlConnection.setDoOutput(true); // pour poster
 					urlConnection.setDoInput(true); // pour lire
 					urlConnection.setUseCaches(false);

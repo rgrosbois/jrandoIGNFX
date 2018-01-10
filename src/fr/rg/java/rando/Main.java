@@ -16,7 +16,11 @@ public class Main extends Application {
 	// Sauvegarde de la longitude
 	static final String SAVED_LONGITUDE_KEY = "saved_longitude";
 	// Sauvegarde de la clé IGN
-	static final String IGNKEY_KEY = "ign_key";
+	public static final String IGNKEY_KEY = "ign_key";
+	// Sauvegarde du proxy
+	public static final String PROXY_HOSTNAME_KEY = "proxy_hostname_key";
+	// Sauvegarde du port du proxy
+	public static final String PROXY_PORT_NUMBER_KEY = "proxy_port_key";
 
 	static final double DEFAULT_LATITUDE = 45.145f;
 	static final double DEFAULT_LONGITUDE = 5.72f;
@@ -41,8 +45,6 @@ public class Main extends Application {
 			Parent root = loader.load();
 			Scene scene = new Scene(root);
 			primaryStage.setScene(scene);
-			//primaryStage.setResizable(false);
-			//primaryStage.setFullScreen(true);
 			primaryStage.setTitle(APP_TITLE);
 			primaryStage.show();
 		} catch (Exception e) {

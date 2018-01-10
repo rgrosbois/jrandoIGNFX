@@ -1,0 +1,18 @@
+#progressBar {
+	-fx-min-height: 2.0;
+	-fx-pref-height: 10.0;
+	-fx-max-height: 20.0;
+}
+
+#scrollPane {
+	-fx-min-height: 250.0;
+	-fx-pref-height: 800.0;
+	-fx-max-height: 1200.0;
+	-fx-hbar-policy: never;
+	-fx-vbar-policy: never;
+}
+
+#trace {
+	-fx-stroke: red;
+	-fx-stroke-width: 5.0;
+}

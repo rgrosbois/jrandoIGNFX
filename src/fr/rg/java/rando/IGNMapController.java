@@ -6,6 +6,8 @@ import java.awt.Rectangle;
 import java.io.File;
 import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.URL;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
@@ -18,11 +20,11 @@ import fr.rg.java.rando.util.WMTS;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 import javafx.embed.swing.SwingFXUtils;
+import javafx.fxml.FXML;
 import javafx.geometry.Point2D;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.control.ScrollPane.ScrollBarPolicy;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -31,76 +33,63 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.image.WritablePixelFormat;
-import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Pane;
-import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Line;
 import javafx.scene.shape.Polyline;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Screen;
+import javafx.stage.Window;
 
-public class IGNMap extends BorderPane {
+public class IGNMapController {
+	@FXML
+	private ProgressBar progressBar;
+
+	@FXML
+	private ImageView mapView;
+
+	@FXML
+	private Pane layerWMTS;
+
+	@FXML
+	private Polyline trace;
+
+	@FXML
+	private ToggleButton wmtsGridBtn;
+
+	@FXML
+	private ScrollPane mapScrollPane;
+
+	@FXML
+	private BorderPane mapContainer;
+
+	int numTileX;
+	int numTileY;
 	static final int TILE_PIXEL_DIM = 256;
-	static final String DEFAULT_IGNKEY = "8qea2r2xtmjxox2esrfaft9k";
+	public static final String DEFAULT_IGNKEY = "8qea2r2xtmjxox2esrfaft9k";
 
-	final int numTileX;
-	final int numTileY;
-
-	public static String cleIGN = DEFAULT_IGNKEY;
-	WritableImage mapImg = null;
-	Pane mapContentPane = null;
-	ImageView mapView;
-	Point2D mapWmtsOrig; // Coordonnées WMTS de l'origine
 	int ignScale = 15;
 	boolean useCache = true;
 	boolean ortho = false;
-	ScrollPane mapScrollPane;
-	ProgressBar progressBar;
+	Point2D mapWmtsOrig; // Coordonnées WMTS de l'origine
 	TileLoadingService tls = null;
-	Pane layerWMTS;
-	Polyline trace;
-	ToggleButton wmtsGridBtn;
 
-	public IGNMap() {
-		// Ajouter un indicateur de progression
-		progressBar = new ProgressBar();
-		progressBar.setMinHeight(2);
-		progressBar.setPrefHeight(10);
-		progressBar.setMaxHeight(20);
-		AnchorPane aPane = new AnchorPane(progressBar);
-		AnchorPane.setLeftAnchor(progressBar, 0.0);
-		AnchorPane.setRightAnchor(progressBar, 0.0);
-		setTop(aPane);
+	public void setPrefHeight(double height) {
+		mapContainer.setPrefHeight(height);
+	}
 
-		// Calques sur la zone de carte
-		mapView = new ImageView(); // affichage de la carte
-		layerWMTS = new Pane(); // grille WMTS
-		// Forme pour la trace
-		trace = new Polyline();
-		trace.setStroke(Color.RED);
-		trace.setStrokeWidth(5);
-		mapContentPane = new Pane(mapView, layerWMTS, trace);
+	public void setPrefWidth(double width) {
+		mapContainer.setPrefWidth(width);
+	}
 
-		// Ajout des calques dans un scrollpane
-		mapScrollPane = new ScrollPane(mapContentPane);
-		mapScrollPane.setPannable(true);
-		mapScrollPane.setMinHeight(250);
-		mapScrollPane.setPrefHeight(800);
-		mapScrollPane.setMaxHeight(1200);
-		mapScrollPane.setHbarPolicy(ScrollBarPolicy.NEVER);
-		mapScrollPane.setVbarPolicy(ScrollBarPolicy.NEVER);
-		setCenter(mapScrollPane);
+	public Window getWindow() {
+		return mapContainer.getScene().getWindow();
+	}
 
-		// Boutons de contrôle
-		wmtsGridBtn = new ToggleButton();
-		ImageView iv = new ImageView(new Image(getClass().getResourceAsStream("/res/img/Grid.png")));
-		iv.setFitWidth(16);
-		iv.setFitHeight(16);
-		wmtsGridBtn.setGraphic(iv);
-		setRight(new VBox(wmtsGridBtn));
+	@FXML
+	void initialize() {
 		wmtsGridBtn.setOnAction((e) -> {
 			toggleWMTSLayer();
 		});
@@ -124,10 +113,6 @@ public class IGNMap extends BorderPane {
 		// Nouvelle image modifiable
 		WritableImage mapImg = new WritableImage(TILE_PIXEL_DIM * numTileX, TILE_PIXEL_DIM * numTileY);
 		mapView.setImage(mapImg);
-
-		// Clé IGN
-		Preferences prefs = Preferences.userNodeForPackage(Main.class);
-		cleIGN = prefs.get(Main.IGNKEY_KEY, DEFAULT_IGNKEY);
 	}
 
 	/**
@@ -284,13 +269,18 @@ public class IGNMap extends BorderPane {
 					String key;
 					File cacheFile;
 
+					// Récupérer les préférences
+					Preferences prefs = Preferences.userNodeForPackage(Main.class);
+					String cleIGN = prefs.get(Main.IGNKEY_KEY, DEFAULT_IGNKEY);
+					String proxyHostname = prefs.get(Main.PROXY_HOSTNAME_KEY, "");
+					String proxyPortNum = prefs.get(Main.PROXY_PORT_NUMBER_KEY, "0");
+
 					// Répertoire cache
 					File localTileCacheDir = new File(System.getProperty("user.home") + File.separator + ".jrandoIGN"
 							+ File.separator + "cache" + File.separator);
 					if (!localTileCacheDir.exists()) {
 						localTileCacheDir.mkdirs();
 					}
-
 					int[] buffer = new int[TILE_PIXEL_DIM * TILE_PIXEL_DIM];
 					WritablePixelFormat<IntBuffer> pxFormat = PixelFormat.getIntArgbInstance();
 					int maxIterations = tilesBounds.width * tilesBounds.height;
@@ -311,7 +301,12 @@ public class IGNMap extends BorderPane {
 											+ "&STYLE=normal" + "&TILEMATRIXSET=PM&TILEMATRIX=" + ignScale + "&TILEROW="
 											+ (row + tilesBounds.y) + "&TILECOL=" + (col + tilesBounds.x)
 											+ "&FORMAT=image/jpeg");
-									connection = (HttpURLConnection) url.openConnection();
+									if (!"".equals(proxyHostname)) { // utiliser un proxy
+										connection = (HttpURLConnection) url.openConnection(new Proxy(Proxy.Type.HTTP,
+												new InetSocketAddress(proxyHostname, Integer.parseInt(proxyPortNum))));
+									} else { // Pas de proxy
+										connection = (HttpURLConnection) url.openConnection();
+									}
 									connection.setRequestProperty("Referer", "http://localhost/IGN/");
 									img = new Image(connection.getInputStream());
 									// Enregistrer dans le cache

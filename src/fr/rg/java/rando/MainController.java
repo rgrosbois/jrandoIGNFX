@@ -3,6 +3,7 @@ package fr.rg.java.rando;
 import java.awt.MouseInfo;
 import java.awt.Point;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -19,27 +20,62 @@ import javafx.beans.value.ObservableValue;
 import javafx.concurrent.WorkerStateEvent;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.geometry.Rectangle2D;
 import javafx.geometry.Side;
+import javafx.scene.Parent;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.CustomMenuItem;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.ButtonBar.ButtonData;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
+import javafx.util.Pair;
 
 public class MainController {
 	@FXML
-	IGNMap map;
+	private VBox mainContent;
 
-	@FXML
-	InfoGraph graph;
+	// Contrôleur de l'affichage de statistiques
+	InfoGraphController infoController;
 
+	// Contrôleur de l'affichage de carte
+	IGNMapController mapController;
+
+	/**
+	 * Finalise l'initialisation de l'IHM en ajoutant les zones pour la carte et les
+	 * statistiques.
+	 *
+	 * Redimensionne l'application en fonction de la taille de l'écran.
+	 */
 	@FXML
 	void initialize() {
+		// Ajouter l'IHM pour la carte
+		try {
+			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Map_ihm.fxml"));
+			mainContent.getChildren().add(loader.load());
+			mapController = (IGNMapController) loader.getController();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		// Ajouter l'IHM pour les statistiques
+		try {
+			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Info_ihm.fxml"));
+			mainContent.getChildren().add(loader.load());
+			infoController = (InfoGraphController) loader.getController();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
 		// Dimensions du graph et de la carte déduites de celle de l'écran
 		Point p = MouseInfo.getPointerInfo().getLocation();
 		Screen currentScreen = Screen.getPrimary(); // écran primaire par défaut
@@ -51,20 +87,25 @@ public class MainController {
 		Rectangle2D screenBounds = currentScreen.getBounds();
 		double prefWidth = 13 * screenBounds.getWidth() / 15;
 		double prefHeight = 13 * screenBounds.getHeight() / 15;
-		map.setPrefWidth(prefWidth);
-		graph.setPrefWidth(prefWidth);
-		map.setPrefHeight(0.7 * prefHeight);
-		graph.setPrefHeight(0.2 * prefHeight);
+		mapController.setPrefWidth(prefWidth);
+		infoController.setPrefWidth(prefWidth);
+		mapController.setPrefHeight(0.7 * prefHeight);
+		infoController.setPrefHeight(0.2 * prefHeight);
 
 		// Géolocalisation initiale pour centrer la carte
 		Preferences prefs = Preferences.userNodeForPackage(Main.class);
 		GeoLocation centerLoc = new GeoLocation(prefs.getDouble(Main.SAVED_LONGITUDE_KEY, Main.DEFAULT_LONGITUDE),
 				prefs.getDouble(Main.SAVED_LATITUDE_KEY, Main.DEFAULT_LATITUDE));
-		map.initMap(centerLoc);
+		mapController.initMap(centerLoc);
 	}
 
+	/**
+	 * Charger une trace enregistrée dans un fichier KML.
+	 *
+	 * @param e
+	 */
 	@FXML
-	void addTrack(ActionEvent e) {
+	void loadTrack(ActionEvent e) {
 		// Sélecteur de fichier
 		FileChooser chooser = new FileChooser();
 		FileChooser.ExtensionFilter filter = new FileChooser.ExtensionFilter("fichier KML (*.kml)", "*.kml");
@@ -74,7 +115,7 @@ public class MainController {
 		Preferences prefs = Preferences.userNodeForPackage(Main.class);
 		chooser.setInitialDirectory(new File(prefs.get(Main.KML_DIR_KEY, "/tmp")));
 
-		File file = chooser.showOpenDialog(map.getScene().getWindow());
+		File file = chooser.showOpenDialog(mapController.getWindow());
 		if (file == null || !file.exists())
 			return;
 
@@ -91,12 +132,27 @@ public class MainController {
 		ArrayList<GeoLocation> list = (ArrayList<GeoLocation>) infoKML.get(KMLReader.LOCATIONS_KEY);
 
 		// Ajouter la trace sur la carte et dans le graphe
-		map.setTrack(list);
-		graph.setTrack(list);
+		mapController.setTrack(list);
+		infoController.setTrack(list);
 
 		// Mettre à jour le titre
-		Stage stage = (Stage)map.getScene().getWindow();
+		Stage stage = (Stage) mapController.getWindow();
 		stage.setTitle(Main.APP_TITLE + " - " + file.getName());
+	}
+
+	@FXML
+	void openParameters(ActionEvent e) {
+		Dialog<String> dialog = new Dialog<>();
+		try {
+			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Dialog_parameters_ihm.fxml"));
+			Parent root = loader.load();
+			dialog.setTitle("Paramètres");
+			dialog.getDialogPane().setContent(root);
+			dialog.setGraphic(new ImageView(getClass().getResource("/res/img/Parameters.png").toString()));
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+		dialog.showAndWait();
 	}
 
 	@FXML
@@ -109,7 +165,7 @@ public class MainController {
 		dialog.setHeaderText("Rechercher une adresse");
 		dialog.setContentText("adresse:");
 		dialog.initModality(Modality.WINDOW_MODAL);
-		dialog.initOwner(map.getScene().getWindow());
+		dialog.initOwner(mapController.getWindow());
 
 		// Autocomplétion
 		TextField tf = dialog.getEditor();
@@ -173,11 +229,11 @@ public class MainController {
 			AddressSuggestionService as = new AddressSuggestionService(address, 5);
 			as.setOnSucceeded((WorkerStateEvent event) -> {
 				ArrayList<GeoLocation> loc = (ArrayList<GeoLocation>) event.getSource().getValue();
-				map.initMap(loc.get(0));
+				mapController.initMap(loc.get(0));
 			});
 			as.start();
 			// Mettre à jour le titre
-			Stage stage = (Stage)map.getScene().getWindow();
+			Stage stage = (Stage) mapController.getWindow();
 			stage.setTitle(Main.APP_TITLE + " - " + address);
 		});
 	}

@@ -1,0 +1,21 @@
+.root {
+	-fx-background-color: white;
+}
+
+#toolbar {
+	-fx-padding: 10.0 10.0 5.0 10.0;
+	-fx-spacing: 10.0;
+}
+
+.actionButton {
+	-fx-background-color: transparent;
+}
+
+.actionButton:hover {
+	-fx-cursor: hand;
+	-fx-background-color: lightblue;
+}
+
+#content {
+	-fx-padding: 5.0 10.0 10.0 10.0;
+}
