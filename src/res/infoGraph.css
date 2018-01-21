@@ -18,7 +18,7 @@
 	-fx-padding: 5.0;
 }
 
-#elevationChart .axis-label {
+#elevationChartYAxis .axis-label {
 	-fx-text-fill: red;
 }
 

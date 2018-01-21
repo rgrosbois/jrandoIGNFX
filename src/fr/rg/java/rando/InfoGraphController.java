@@ -116,25 +116,26 @@ public class InfoGraphController {
 	void initialize() {
 		chartArea.setOnMouseMoved(null);
 		chartArea.setMouseTransparent(false);
+		final double yAxisWidth = 80.0;
 
 		// Graphe initial (prévoir 80 px à droite pour l'axe du 2eme graphe)
 		elevationChart.getData().add(elevationSerie);
 		elevationChart.prefHeightProperty().bind(chartArea.heightProperty());
-		elevationChart.minWidthProperty().bind(chartArea.widthProperty().subtract(80.0));
-		elevationChart.prefWidthProperty().bind(chartArea.widthProperty().subtract(80.0));
-		elevationChart.maxWidthProperty().bind(chartArea.widthProperty().subtract(80.0));
+		elevationChart.minWidthProperty().bind(chartArea.widthProperty().subtract(yAxisWidth));
+		elevationChart.prefWidthProperty().bind(chartArea.widthProperty().subtract(yAxisWidth));
+		elevationChart.maxWidthProperty().bind(chartArea.widthProperty().subtract(yAxisWidth));
 
 		elevationChart.setVerticalZeroLineVisible(false);
 		elevationChart.setHorizontalZeroLineVisible(false);
 		elevationChart.setVerticalGridLinesVisible(false);
 		elevationChart.setHorizontalGridLinesVisible(false);
 
-		// Graphe surimposé décalé de la largeur de l'axe Y du graphe 1
+		// Graphe surimposé décalé de la largeur de l'axe Y du graphe 1 - Largeur moins 20 ?
 		speedChart.getData().add(speedSerie);
 		speedChart.prefHeightProperty().bind(chartArea.heightProperty());
-		speedChart.minWidthProperty().bind(chartArea.widthProperty().subtract(80.0));
-		speedChart.prefWidthProperty().bind(chartArea.widthProperty().subtract(80.0));
-		speedChart.maxWidthProperty().bind(chartArea.widthProperty().subtract(80.0));
+		speedChart.minWidthProperty().bind(chartArea.widthProperty().subtract(yAxisWidth+20));
+		speedChart.prefWidthProperty().bind(chartArea.widthProperty().subtract(yAxisWidth+20));
+		speedChart.maxWidthProperty().bind(chartArea.widthProperty().subtract(yAxisWidth+20));
 		speedChart.translateXProperty().bind(elevationChart.getYAxis().widthProperty());
 		speedChart.setMouseTransparent(true);
 
@@ -146,11 +147,11 @@ public class InfoGraphController {
 	}
 
 	public void setPrefWidth(double width) {
-		((BorderPane)chartArea.getParent()).setPrefWidth(width);
+		((BorderPane) chartArea.getParent()).setPrefWidth(width);
 	}
 
 	public void setPrefHeight(double height) {
-		((BorderPane)chartArea.getParent()).setPrefWidth(height);
+		((BorderPane) chartArea.getParent()).setPrefWidth(height);
 	}
 
 	private void bindMouseEvents() {
@@ -234,8 +235,10 @@ public class InfoGraphController {
 	/**
 	 * Calcule et retourne la vitesse en km/h.
 	 *
-	 * @param distance en mètre
-	 * @param duree en secondes
+	 * @param distance
+	 *            en mètre
+	 * @param duree
+	 *            en secondes
 	 * @return
 	 */
 	private String distDuree2Vitesse(double distance, double duree) {
@@ -256,7 +259,7 @@ public class InfoGraphController {
 		if (distance < 1000) { // Moins d'1km -> afficher en mètres
 			return String.format(Locale.getDefault(), "%d m", (int) distance);
 		} else { // Afficher en kilomètres
-			return String.format(Locale.getDefault(), "%.1f km", distance / 1000f);
+			return String.format(Locale.getDefault(), "%.3f km", distance / 1000f);
 		}
 	}
 
@@ -335,6 +338,8 @@ public class InfoGraphController {
 		long dureePause = 0; // Durée de la pause
 		float deltaElev;
 		float cumulDist = 0;
+		XYChart.Data<Number, Number> dataElevation = null;
+		XYChart.Data<Number, Number> dataSpeed = null;
 		for (GeoLocation loc : geoLoc) {
 			// Utiliser la bonne information d'altitude
 			if (elevFromGPS) {
@@ -391,12 +396,17 @@ public class InfoGraphController {
 			}
 
 			// Compléter les courbes
-			elevationSerie.getData().add(new XYChart.Data<>(loc.length / 1000., loc.dispElevation));
-			speedSerie.getData().add(new XYChart.Data<>(loc.length / 1000., loc.speed));
+			dataElevation = new XYChart.Data<>(loc.length / 1000., loc.dispElevation);
+			elevationSerie.getData().add(dataElevation);
+			dataSpeed = new XYChart.Data<>(loc.length / 1000., loc.speed);
+			speedSerie.getData().add(dataSpeed);
 
 			// Se souvenir de cette géolocalisation à la prochaine itération.
 			lastLoc = loc;
 		}
+
+		System.out.println(dataElevation);
+		System.out.println(dataSpeed);
 
 		// Adapter les échelles des axes verticaux
 		NumberAxis elevationYAxis = (NumberAxis) elevationChart.getYAxis();
@@ -558,7 +568,7 @@ public class InfoGraphController {
 	public void updateChartInfo(MouseEvent event) {
 		// Distance
 		double xValue = (double) elevationChart.getXAxis().getValueForDisplay(event.getX());
-		distanceInfoLbl.setText(dist2String(xValue * 1000));
+		distanceInfoLbl.setText(String.format("%.3f km", xValue));
 
 		if (geoLoc != null && geoLoc.size() > 0) {
 			GeoLocation g = findGeoLoc(xValue * 1000);
@@ -570,7 +580,7 @@ public class InfoGraphController {
 				elevationInfoLbl.setText(String.format("%.0f m", g.dispElevation));
 				speedInfoLbl.setText(String.format("%.2f km/h", g.speed));
 				// Durée
-				long duree = g.timeStampS-geoLoc.get(0).timeStampS;
+				long duree = g.timeStampS - geoLoc.get(0).timeStampS;
 				timeInfoLbl.setText(time2String(duree, true));
 				return;
 			}

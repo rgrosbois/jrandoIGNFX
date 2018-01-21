@@ -72,7 +72,7 @@
 							</xAxis>
 							<yAxis>
 								<NumberAxis label="Vitesse [km/h]" maxWidth="50"
-									minWidth="50" prefWidth="50" side="RIGHT" />
+									id="speedChartYAxis" minWidth="50" prefWidth="50" side="RIGHT" />
 							</yAxis>
 						</LineChart>
 						<LineChart fx:id="elevationChart" id="elevationChart"
@@ -82,7 +82,7 @@
 								<NumberAxis label="Distance [km]" opacity="0.0" side="BOTTOM" />
 							</xAxis>
 							<yAxis>
-								<NumberAxis label="Altitude [m]" maxWidth="50"
+								<NumberAxis label="Altitude [m]" maxWidth="50" id="elevationChartYAxis"
 									upperBound="2000" minWidth="70" prefWidth="70" side="LEFT" />
 							</yAxis>
 						</LineChart>
