@@ -10,6 +10,7 @@
 	-fx-max-height: 1200.0;
 	-fx-hbar-policy: never;
 	-fx-vbar-policy: never;
+	-fx-background-radius: 10;
 }
 
 #trace {

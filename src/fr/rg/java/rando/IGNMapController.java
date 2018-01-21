@@ -11,6 +11,8 @@ import java.net.Proxy;
 import java.net.URL;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.prefs.Preferences;
 
 import javax.imageio.ImageIO;
@@ -281,14 +283,67 @@ public class IGNMapController {
 					if (!localTileCacheDir.exists()) {
 						localTileCacheDir.mkdirs();
 					}
+
+					// Tampon de la grande image à remplir à l'aide de tuiles
 					int[] buffer = new int[TILE_PIXEL_DIM * TILE_PIXEL_DIM];
 					WritablePixelFormat<IntBuffer> pxFormat = PixelFormat.getIntArgbInstance();
+
+					// Créer une HashMap pour classer les tuiles en fonction de leur distance au
+					// centre: 1 clé par distance, la valeur associée est une ArrayList de noms de
+					// tuiles
+					int dist;
+					HashMap<Integer, ArrayList<String>> classement = new HashMap<>();
+					ArrayList<String> a;
+					int maxDist = 0;
+					int r, c;
+					for (r = tilesBounds.y; r < tilesBounds.y + tilesBounds.height; r++) { // Lignes de tuiles
+						for (c = tilesBounds.x; c < tilesBounds.x + tilesBounds.width; c++) { // Colonnes de tuiles
+							dist = (int) Math.sqrt(Math.pow(r - tilesBounds.y - tilesBounds.height / 2, 2)
+									+ Math.pow(c - tilesBounds.x - tilesBounds.width / 2, 2));
+							key = (ortho ? "ortho-" : "") + "z" + ignScale + "-r" + r + "-c" + c;
+
+							// Créer l'Arraylist si nécessaire
+							a = classement.get(dist);
+							if (a == null) {
+								classement.put(dist, new ArrayList<String>());
+								a = classement.get(dist);
+							}
+							if (dist > maxDist) {
+								maxDist = dist;
+							}
+
+							// Insérer l'élément
+							a.add(key);
+						}
+					}
+
+					// Récupérer les tuiles dans l'ordre de leur distance au centre
 					int maxIterations = tilesBounds.width * tilesBounds.height;
 					int iterations = 1;
-					for (int row = 0; row < tilesBounds.height; row++) {
-						for (int col = 0; col < tilesBounds.width; col++) {
-							key = (ortho ? "ortho-" : "") + "z" + ignScale + "-r" + (row + tilesBounds.y) + "-c"
-									+ (col + tilesBounds.x);
+
+					Iterator<String> it;
+					String[] tInfo;
+					for (int i = 0; i <= maxDist; i++) {
+						a = classement.get(i);
+						if (a == null) {
+							continue;
+						}
+						it = a.iterator();
+						while (it.hasNext()) { // Boucle sur les tuiles à la même distance
+							key = it.next();
+
+							// Récupérer les indices de colonne et ligne
+							tInfo = key.split("-");
+							r = 0;
+							c = 0;
+							if (tInfo.length == 3) {
+								r = Integer.parseInt(tInfo[1].substring(1));
+								c = Integer.parseInt(tInfo[2].substring(1));
+							} else if (tInfo.length == 4) {
+								r = Integer.parseInt(tInfo[2].substring(1));
+								c = Integer.parseInt(tInfo[3].substring(1));
+							}
+
 							cacheFile = new File(localTileCacheDir, key + ".jpg");
 							if (useCache && cacheFile.exists()) { // utiliser cache
 								img = new Image("file:" + cacheFile.getAbsolutePath());
@@ -299,8 +354,7 @@ public class IGNMapController {
 											+ (ortho ? "&LAYER=ORTHOIMAGERY.ORTHOPHOTOS"
 													: "&LAYER=GEOGRAPHICALGRIDSYSTEMS.MAPS")
 											+ "&STYLE=normal" + "&TILEMATRIXSET=PM&TILEMATRIX=" + ignScale + "&TILEROW="
-											+ (row + tilesBounds.y) + "&TILECOL=" + (col + tilesBounds.x)
-											+ "&FORMAT=image/jpeg");
+											+ r + "&TILECOL=" + c + "&FORMAT=image/jpeg");
 									if (!"".equals(proxyHostname)) { // utiliser un proxy
 										connection = (HttpURLConnection) url.openConnection(new Proxy(Proxy.Type.HTTP,
 												new InetSocketAddress(proxyHostname, Integer.parseInt(proxyPortNum))));
@@ -322,11 +376,14 @@ public class IGNMapController {
 							pxReader = img.getPixelReader();
 							pxReader.getPixels(0, 0, TILE_PIXEL_DIM, TILE_PIXEL_DIM, pxFormat, buffer, 0,
 									TILE_PIXEL_DIM);
-							pxWriter.setPixels(col * TILE_PIXEL_DIM, row * TILE_PIXEL_DIM, TILE_PIXEL_DIM,
-									TILE_PIXEL_DIM, pxReader, 0, 0);
+							pxWriter.setPixels((c - tilesBounds.x) * TILE_PIXEL_DIM,
+									(r - tilesBounds.y) * TILE_PIXEL_DIM, TILE_PIXEL_DIM, TILE_PIXEL_DIM, pxReader, 0,
+									0);
 							updateProgress(iterations++, maxIterations);
 						}
 					}
+
+					// Réinitialiser la barre de progression
 					updateProgress(0, maxIterations);
 					return null;
 				}

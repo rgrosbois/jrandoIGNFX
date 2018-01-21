@@ -1,0 +1,56 @@
+#statContainer {
+	-fx-spacing: 5.0;
+	-fx-padding: 5.0;
+}
+
+.fieldName {
+  -fx-font-size: 8.0;
+}
+
+.fieldContent {
+  -fx-font-size: 10.0;
+  -fx-padding: 0.0 0.0 5.0 0.0;
+}
+
+.elevationType {
+	-fx-font-size: 10.0;
+	-fx-spacing: 3.0;
+	-fx-padding: 5.0;
+}
+
+#elevationChart .axis-label {
+	-fx-text-fill: red;
+}
+
+#elevationChart .chart-series-line {
+	-fx-stroke: red;
+	-fx-stroke-width: 2.0;
+}
+
+#elevationChart .chart-content .chart-plot-background {
+	-fx-background-color: transparent ;
+}
+
+#speedChart .axis-label {
+	-fx-text-fill: blue;
+}
+
+#detailsPopup {
+	-fx-border-width: 1.0px;
+	-fx-padding: 5.0 5.0 5.0 5.0px;
+	-fx-border-color: gray;
+	-fx-background-color: whitesmoke;
+}
+
+#speedChart .chart-series-line {
+	-fx-stroke: blue;
+	-fx-stroke-width: 2.0;
+}
+
+#elevationInfoLbl {
+	-fx-text-fill: red;
+}
+
+#speedInfoLbl {
+	-fx-text-fill:blue;
+}

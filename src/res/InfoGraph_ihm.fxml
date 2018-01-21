@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.chart.LineChart?>
+<?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.control.ToggleGroup?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane stylesheets="@infoGraph.css" xmlns="http://javafx.com/javafx/9"
+	xmlns:fx="http://javafx.com/fxml/1" fx:controller="fr.rg.java.rando.InfoGraphController">
+	<right>
+		<VBox>
+			<children>
+				<HBox alignment="CENTER" styleClass="elevationType">
+					<children>
+						<ToggleButton fx:id="gpsElevBtn" mnemonicParsing="false"
+							onAction="#resetFromElevationSource" selected="true" text="GPS">
+							<toggleGroup>
+								<ToggleGroup fx:id="elevationTypeGroup" />
+							</toggleGroup>
+						</ToggleButton>
+						<ToggleButton fx:id="modelElevBtn" mnemonicParsing="false"
+							onAction="#resetFromElevationSource" text="Modèle" toggleGroup="$elevationTypeGroup" />
+					</children>
+				</HBox>
+				<HBox id="statContainer">
+					<VBox>
+						<Label styleClass="fieldName" text="Altitude min" />
+						<Label fx:id="altMinTF" styleClass="fieldContent" text="-" />
+						<Label styleClass="fieldName" text="Dénivelé pos" />
+						<Label fx:id="denivPosTF" styleClass="fieldContent" text="-" />
+						<Label styleClass="fieldName" text="Durée totale" />
+						<Label fx:id="dureeTotTF" styleClass="fieldContent" text="-" />
+						<Label styleClass="fieldName" text="Vitesse" />
+						<Label fx:id="vitMoyTF" styleClass="fieldContent" text="-" />
+						<Label styleClass="fieldName" text="Distance" />
+						<Label fx:id="distanceTF" styleClass="fieldContent" text="-" />
+					</VBox>
+					<VBox>
+						<Label styleClass="fieldName" text="Altitude max" />
+						<Label fx:id="altMaxTF" styleClass="fieldContent" text="-" />
+						<Label styleClass="fieldName" text="Dénivelé neg" />
+						<Label fx:id="denivNegTF" styleClass="fieldContent" text="-" />
+						<Label styleClass="fieldName" text="(sans pause)" />
+						<Label fx:id="dureeSansPauseTF" styleClass="fieldContent"
+							text="-" />
+						<Label styleClass="fieldName" text="(sans pause)" />
+						<Label fx:id="vitMoySansPauseTF" styleClass="fieldContent"
+							text="-" />
+					</VBox>
+				</HBox>
+			</children>
+		</VBox>
+	</right>
+	<center>
+		<AnchorPane fx:id="chartArea">
+			<children>
+				<StackPane alignment="CENTER_LEFT" AnchorPane.leftAnchor="0.0"
+					AnchorPane.rightAnchor="0.0">
+					<children>
+						<LineChart fx:id="speedChart" id="speedChart"
+							createSymbols="false" legendVisible="false" maxHeight="300.0"
+							minHeight="100.0" prefHeight="200.0">
+							<xAxis>
+								<NumberAxis label="Distance [km]" side="BOTTOM" />
+							</xAxis>
+							<yAxis>
+								<NumberAxis label="Vitesse [km/h]" maxWidth="50"
+									minWidth="50" prefWidth="50" side="RIGHT" />
+							</yAxis>
+						</LineChart>
+						<LineChart fx:id="elevationChart" id="elevationChart"
+							createSymbols="false" legendVisible="false" maxHeight="300.0"
+							minHeight="100.0" prefHeight="200.0">
+							<xAxis>
+								<NumberAxis label="Distance [km]" opacity="0.0" side="BOTTOM" />
+							</xAxis>
+							<yAxis>
+								<NumberAxis label="Altitude [m]" maxWidth="50"
+									upperBound="2000" minWidth="70" prefWidth="70" side="LEFT" />
+							</yAxis>
+						</LineChart>
+						<AnchorPane fx:id="detailsLayer">
+							<children>
+								<VBox fx:id="detailsPopup" id="detailsPopup" visible="false">
+									<Label fx:id="distanceInfoLbl" />
+									<Label fx:id="elevationInfoLbl" id="elevationInfoLbl" />
+									<Label fx:id="speedInfoLbl" id="speedInfoLbl" />
+									<Label fx:id="timeInfoLbl" />
+								</VBox>
+							</children>
+						</AnchorPane>
+					</children>
+				</StackPane>
+			</children>
+		</AnchorPane>
+	</center>
+	<bottom>
+		<AnchorPane>
+			<children>
+				<ProgressBar fx:id="progressBar" maxHeight="20.0"
+					minHeight="2.0" prefHeight="10.0" progress="0.0"
+					AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" />
+			</children>
+		</AnchorPane>
+	</bottom>
+</BorderPane>

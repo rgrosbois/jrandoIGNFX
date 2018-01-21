@@ -13,7 +13,7 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/9" xmlns:fx="http://javafx.com/fxml/1"
 	fx:controller="fr.rg.java.rando.IGNMapController" fx:id="mapContainer"
-	stylesheets="@map.css">
+	stylesheets="@IGNmap.css">
 	<top>
 		<AnchorPane BorderPane.alignment="CENTER">
 			<children>

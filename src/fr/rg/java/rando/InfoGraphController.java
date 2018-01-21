@@ -17,6 +17,9 @@ import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.scene.Cursor;
+import javafx.scene.Node;
+import javafx.scene.chart.Axis;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
@@ -24,16 +27,14 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Line;
 
 public class InfoGraphController {
-
-	static final float SEUIL_VITESSE = 1.5f; // en km/h (calcul des pauses)
-	static final float MIN_DELTA_ALT = 10f; // en m (lissage des altitudes)
-	static final float MAX_DELTA_ALT = 50f; // en m (lissage des altitudes)
-
-	@FXML
-	private BorderPane infoContainer;
 
 	@FXML
 	private Label altMinTF;
@@ -54,13 +55,29 @@ public class InfoGraphController {
 	private Label dureeSansPauseTF;
 
 	@FXML
+	private Label vitMoyTF;
+
+	@FXML
+	private Label vitMoySansPauseTF;
+
+	@FXML
 	private Label distanceTF;
 
-	@FXML
-	private LineChart<Number, Number> lineChart;
+	// Séries de données pour les graphes
+	private XYChart.Series<Number, Number> elevationSerie = new XYChart.Series<>();
+	private XYChart.Series<Number, Number> speedSerie = new XYChart.Series<>();
+
+	// Liste de géolocalisations de la tracer courante
+	private ArrayList<GeoLocation> geoLoc;
 
 	@FXML
-	private NumberAxis yAxis;
+	private LineChart<Number, Number> elevationChart;
+
+	@FXML
+	private LineChart<Number, Number> speedChart;
+
+	@FXML
+	private AnchorPane chartArea;
 
 	@FXML
 	private ProgressBar progressBar;
@@ -74,21 +91,121 @@ public class InfoGraphController {
 	@FXML
 	private ToggleGroup elevationTypeGroup;
 
-	XYChart.Series<Number, Number> serie = new XYChart.Series<>();
-	private ArrayList<GeoLocation> geoLoc;
+	@FXML
+	private AnchorPane detailsLayer;
+
+	@FXML
+	private VBox detailsPopup;
+
+	@FXML
+	private Label distanceInfoLbl;
+
+	@FXML
+	private Label elevationInfoLbl;
+
+	@FXML
+	private Label speedInfoLbl;
+
+	@FXML
+	private Label timeInfoLbl;
+
+	/**
+	 * Finaliser l'initialisation des graphes
+	 */
+	@FXML
+	void initialize() {
+		chartArea.setOnMouseMoved(null);
+		chartArea.setMouseTransparent(false);
+
+		// Graphe initial (prévoir 80 px à droite pour l'axe du 2eme graphe)
+		elevationChart.getData().add(elevationSerie);
+		elevationChart.prefHeightProperty().bind(chartArea.heightProperty());
+		elevationChart.minWidthProperty().bind(chartArea.widthProperty().subtract(80.0));
+		elevationChart.prefWidthProperty().bind(chartArea.widthProperty().subtract(80.0));
+		elevationChart.maxWidthProperty().bind(chartArea.widthProperty().subtract(80.0));
+
+		elevationChart.setVerticalZeroLineVisible(false);
+		elevationChart.setHorizontalZeroLineVisible(false);
+		elevationChart.setVerticalGridLinesVisible(false);
+		elevationChart.setHorizontalGridLinesVisible(false);
+
+		// Graphe surimposé décalé de la largeur de l'axe Y du graphe 1
+		speedChart.getData().add(speedSerie);
+		speedChart.prefHeightProperty().bind(chartArea.heightProperty());
+		speedChart.minWidthProperty().bind(chartArea.widthProperty().subtract(80.0));
+		speedChart.prefWidthProperty().bind(chartArea.widthProperty().subtract(80.0));
+		speedChart.maxWidthProperty().bind(chartArea.widthProperty().subtract(80.0));
+		speedChart.translateXProperty().bind(elevationChart.getYAxis().widthProperty());
+		speedChart.setMouseTransparent(true);
+
+		// Couche d'information avec popup
+		bindMouseEvents();
+		elevationInfoLbl.managedProperty().bind(elevationInfoLbl.visibleProperty());
+		speedInfoLbl.managedProperty().bind(speedInfoLbl.visibleProperty());
+		timeInfoLbl.managedProperty().bind(timeInfoLbl.visibleProperty());
+	}
 
 	public void setPrefWidth(double width) {
-		infoContainer.setPrefWidth(width);
+		((BorderPane)chartArea.getParent()).setPrefWidth(width);
 	}
 
 	public void setPrefHeight(double height) {
-		infoContainer.setPrefHeight(height);
+		((BorderPane)chartArea.getParent()).setPrefWidth(height);
 	}
 
-	@FXML
-	void initialize() {
-		lineChart.getData().add(serie);
-		lineChart.setLegendVisible(false);
+	private void bindMouseEvents() {
+		detailsLayer.prefHeightProperty().bind(chartArea.heightProperty());
+		detailsLayer.prefWidthProperty().bind(chartArea.widthProperty());
+		detailsLayer.setMouseTransparent(true);
+
+		final Axis<Number> xAxis = elevationChart.getXAxis();
+		final Axis<Number> yAxis = elevationChart.getYAxis();
+		final Line yLine = new Line();
+		yLine.setFill(Color.GRAY);
+		yLine.setStrokeWidth(1.0);
+		yLine.setVisible(false);
+
+		final Node chartBackground = elevationChart.lookup(".chart-plot-background");
+		for (Node n : chartBackground.getParent().getChildrenUnmodifiable()) {
+			if (n != chartBackground && n != xAxis && n != yAxis) {
+				n.setMouseTransparent(true);
+			}
+		}
+		chartBackground.setCursor(Cursor.CROSSHAIR);
+		chartBackground.setOnMouseEntered((event) -> {
+			chartBackground.getOnMouseMoved().handle(event);
+			detailsPopup.setVisible(true);
+			yLine.setVisible(true);
+			detailsLayer.getChildren().addAll(yLine);
+		});
+		chartBackground.setOnMouseExited((event) -> {
+			detailsPopup.setVisible(false);
+			yLine.setVisible(false);
+			detailsLayer.getChildren().removeAll(yLine);
+		});
+		chartBackground.setOnMouseMoved(event -> {
+			double x = event.getX() + chartBackground.getLayoutX();
+			double y = event.getY() + chartBackground.getLayoutY();
+
+			yLine.setStartX(x + 5);
+			yLine.setEndX(x + 5);
+			yLine.setStartY(10);
+			yLine.setEndY(detailsLayer.getHeight() - 10);
+
+			updateChartInfo(event);
+
+			if (y + detailsPopup.getHeight() + 10 < chartArea.getHeight()) {
+				AnchorPane.setTopAnchor(detailsPopup, y + 10);
+			} else {
+				AnchorPane.setTopAnchor(detailsPopup, y - 10 - detailsPopup.getHeight());
+			}
+
+			if (x + detailsPopup.getWidth() + 10 < chartArea.getWidth()) {
+				AnchorPane.setLeftAnchor(detailsPopup, x + 10);
+			} else {
+				AnchorPane.setLeftAnchor(detailsPopup, x - 10 - detailsPopup.getWidth());
+			}
+		});
 	}
 
 	/**
@@ -101,7 +218,7 @@ public class InfoGraphController {
 	 * @param dureeSansPause
 	 * @param distance
 	 */
-	public void updateContent(float altMin, float altMax, float denivPos, float denivNeg, long dureeTot,
+	public void updateStatContent(float altMin, float altMax, float denivPos, float denivNeg, long dureeTot,
 			long dureeSansPause, float distance) {
 		altMinTF.setText((int) altMin + "m");
 		altMaxTF.setText((int) altMax + "m");
@@ -109,7 +226,25 @@ public class InfoGraphController {
 		denivNegTF.setText(dist2String(denivNeg));
 		dureeTotTF.setText(time2String(dureeTot, true));
 		dureeSansPauseTF.setText(time2String(dureeSansPause, true));
+		vitMoyTF.setText(distDuree2Vitesse(distance, dureeTot));
+		vitMoySansPauseTF.setText(distDuree2Vitesse(distance, dureeSansPause));
 		distanceTF.setText(dist2String(distance));
+	}
+
+	/**
+	 * Calcule et retourne la vitesse en km/h.
+	 *
+	 * @param distance en mètre
+	 * @param duree en secondes
+	 * @return
+	 */
+	private String distDuree2Vitesse(double distance, double duree) {
+		double vitesse = 0;
+		if (duree != 0) {
+			vitesse = (distance / 1000) / (duree / 3600);
+		}
+
+		return String.format("%.1f km/h", vitesse);
 	}
 
 	/**
@@ -117,11 +252,11 @@ public class InfoGraphController {
 	 *
 	 * @return Distance en mètres (si inférieure à 1km) ou kilomètre sinon.
 	 */
-	private String dist2String(float distance) {
+	private String dist2String(double distance) {
 		if (distance < 1000) { // Moins d'1km -> afficher en mètres
-			return String.format(Locale.getDefault(), "%dm", (int) distance);
+			return String.format(Locale.getDefault(), "%d m", (int) distance);
 		} else { // Afficher en kilomètres
-			return String.format(Locale.getDefault(), "%.1fkm", distance / 1000f);
+			return String.format(Locale.getDefault(), "%.1f km", distance / 1000f);
 		}
 	}
 
@@ -165,7 +300,7 @@ public class InfoGraphController {
 		progressBar.progressProperty().bind(els.progressProperty());
 		els.start();
 
-		resetElevationSource(null);
+		resetFromElevationSource(null);
 	}
 
 	/**
@@ -175,18 +310,26 @@ public class InfoGraphController {
 	 * @param e
 	 */
 	@FXML
-	private void resetElevationSource(ActionEvent e) {
+	private void resetFromElevationSource(ActionEvent e) {
 		// Identification de la source
 		boolean elevFromGPS = gpsElevBtn.isSelected();
 
 		// Effacer les anciennes données
-		serie.getData().clear();
+		elevationSerie.getData().clear();
+		speedSerie.getData().clear();
+
+		// Constantes pour analyse
+		final float SEUIL_VITESSE = 1.5f; // en km/h (calcul des pauses)
+		final float MIN_DELTA_ALT = 10f; // en m (lissage des altitudes)
+		final float MAX_DELTA_ALT = 50f; // en m (lissage des altitudes)
 
 		GeoLocation lastLoc = null;
 		float denivPos = 0;
 		float denivNeg = 0;
 		float altMin = Float.POSITIVE_INFINITY;
 		float altMax = Float.NEGATIVE_INFINITY;
+		float speedMin = Float.POSITIVE_INFINITY;
+		float speedMax = Float.NEGATIVE_INFINITY;
 		boolean pauseDetectee = false;
 		long debutPause = 0; // Instant de départ de la pause
 		long dureePause = 0; // Durée de la pause
@@ -205,6 +348,12 @@ public class InfoGraphController {
 			}
 			if (loc.dispElevation < altMin) {
 				altMin = loc.dispElevation;
+			}
+			if (loc.speed > speedMax) {
+				speedMax = loc.speed;
+			}
+			if (loc.speed < speedMin) {
+				speedMin = loc.speed;
 			}
 
 			if (lastLoc != null) {
@@ -236,25 +385,42 @@ public class InfoGraphController {
 				}
 				// Distance cumulative
 				cumulDist += loc.distance(lastLoc);
-				loc.length = (int)cumulDist;
+				loc.length = (int) cumulDist;
 			} else {
 				loc.length = 0;
 			}
-			serie.getData().add(new XYChart.Data<>(loc.length / 1000., loc.dispElevation));
+
+			// Compléter les courbes
+			elevationSerie.getData().add(new XYChart.Data<>(loc.length / 1000., loc.dispElevation));
+			speedSerie.getData().add(new XYChart.Data<>(loc.length / 1000., loc.speed));
+
+			// Se souvenir de cette géolocalisation à la prochaine itération.
 			lastLoc = loc;
 		}
 
-		// Adapter l'échelle de l'axe vertical
-		yAxis.setAutoRanging(false);
-		yAxis.setLowerBound(((int) altMin / 100) * 100);
-		yAxis.setUpperBound(((int) (altMax + 99) / 100) * 100);
+		// Adapter les échelles des axes verticaux
+		NumberAxis elevationYAxis = (NumberAxis) elevationChart.getYAxis();
+		elevationYAxis.setAutoRanging(false);
+		int min = ((int) altMin / 100) * 100;
+		elevationYAxis.setLowerBound(min);
+		int max = ((int) (altMax + 99) / 100) * 100;
+		elevationYAxis.setUpperBound(max);
+		elevationYAxis.setTickUnit((max - min) / 10);
+
+		NumberAxis speedYAxis = (NumberAxis) speedChart.getYAxis();
+		speedYAxis.setAutoRanging(false);
+		min = 0;
+		speedYAxis.setLowerBound(min);
+		max = ((int) (speedMax + 9) / 10) * 10;
+		speedYAxis.setUpperBound(max);
+		speedYAxis.setTickUnit((max - min) / 10);
 
 		// Afficher les statistiques du parcours
 		if (lastLoc != null) {
-			updateContent(altMin, altMax, denivPos, denivNeg, lastLoc.timeStampS - geoLoc.get(0).timeStampS,
+			updateStatContent(altMin, altMax, denivPos, denivNeg, lastLoc.timeStampS - geoLoc.get(0).timeStampS,
 					lastLoc.timeStampS - geoLoc.get(0).timeStampS - dureePause, cumulDist);
 		} else {
-			updateContent(altMin, altMax, 0, 0, 0, 0, 0);
+			updateStatContent(altMin, altMax, 0, 0, 0, 0, 0);
 		}
 
 	}
@@ -319,7 +485,7 @@ public class InfoGraphController {
 
 		@Override
 		protected void succeeded() {
-			resetElevationSource(null);
+			resetFromElevationSource(null);
 			super.succeeded();
 		}
 
@@ -389,4 +555,49 @@ public class InfoGraphController {
 		}
 	}
 
+	public void updateChartInfo(MouseEvent event) {
+		// Distance
+		double xValue = (double) elevationChart.getXAxis().getValueForDisplay(event.getX());
+		distanceInfoLbl.setText(dist2String(xValue * 1000));
+
+		if (geoLoc != null && geoLoc.size() > 0) {
+			GeoLocation g = findGeoLoc(xValue * 1000);
+			if (g != null) {
+				elevationInfoLbl.setVisible(true);
+				speedInfoLbl.setVisible(true);
+				timeInfoLbl.setVisible(true);
+
+				elevationInfoLbl.setText(String.format("%.0f m", g.dispElevation));
+				speedInfoLbl.setText(String.format("%.2f km/h", g.speed));
+				// Durée
+				long duree = g.timeStampS-geoLoc.get(0).timeStampS;
+				timeInfoLbl.setText(time2String(duree, true));
+				return;
+			}
+		}
+		elevationInfoLbl.setVisible(false);
+		speedInfoLbl.setVisible(false);
+		timeInfoLbl.setVisible(false);
+
+	}
+
+	public GeoLocation findGeoLoc(double dist) {
+		GeoLocation lastLoc = null;
+		for (GeoLocation g : geoLoc) {
+			if (g.length > dist) {
+				if (lastLoc == null) {
+					return g;
+				} else {
+					if (Math.abs(g.length - dist) < Math.abs(lastLoc.length - dist)) {
+						return g;
+					} else {
+						return lastLoc;
+					}
+				}
+			}
+			lastLoc = g;
+		}
+
+		return null;
+	}
 }

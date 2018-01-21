@@ -8,18 +8,25 @@
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.VBox?>
 
-<VBox xmlns="http://javafx.com/javafx/9" xmlns:fx="http://javafx.com/fxml/1" fx:controller="fr.rg.java.rando.DialogParametersController">
+<VBox xmlns="http://javafx.com/javafx/9" xmlns:fx="http://javafx.com/fxml/1"
+	fx:controller="fr.rg.java.rando.DialogParametersController">
 	<children>
 		<GridPane hgap="10.0" vgap="10.0">
 			<children>
 				<Label text="Clé IGN" />
 				<TextField fx:id="ignKeyTF" text="-" GridPane.columnIndex="2" />
 				<Label text="Serveur mandataire" GridPane.rowIndex="1" />
-				<TextField fx:id="proxyNameTF" text="-" GridPane.columnIndex="2" GridPane.rowIndex="1" />
+				<TextField fx:id="proxyNameTF" text="-"
+					GridPane.columnIndex="2" GridPane.rowIndex="1" />
 				<Label text="Port serveur" GridPane.rowIndex="2" />
-				<TextField fx:id="proxyPortTF" text="-" GridPane.columnIndex="2" GridPane.rowIndex="2" />
-            <Button mnemonicParsing="false" onAction="#cancelModif" prefWidth="80.0" text="Annuler" GridPane.halignment="CENTER" GridPane.rowIndex="3" />
-            <Button mnemonicParsing="false" onAction="#okModif" prefWidth="80.0" text="OK" GridPane.columnIndex="2" GridPane.halignment="CENTER" GridPane.rowIndex="3" />
+				<TextField fx:id="proxyPortTF" text="-"
+					GridPane.columnIndex="2" GridPane.rowIndex="2" />
+				<Button mnemonicParsing="false" onAction="#cancelModif"
+					prefWidth="80.0" text="Annuler" GridPane.halignment="CENTER"
+					GridPane.rowIndex="3" />
+				<Button mnemonicParsing="false" onAction="#okModif"
+					prefWidth="80.0" text="OK" GridPane.columnIndex="2"
+					GridPane.halignment="CENTER" GridPane.rowIndex="3" />
 			</children>
 			<columnConstraints>
 				<ColumnConstraints />
@@ -30,7 +37,7 @@
 				<RowConstraints />
 				<RowConstraints />
 				<RowConstraints />
-            <RowConstraints />
+				<RowConstraints />
 			</rowConstraints>
 		</GridPane>
 	</children>

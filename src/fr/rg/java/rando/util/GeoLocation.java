@@ -31,7 +31,7 @@ public class GeoLocation {
 	public float dispElevation;
 	// TimeStamp en secondes
 	public long timeStampS;
-	// Distance parcourue
+	// Distance parcourue en mètres
 	public int length;
 	// Vitesse instantanée
 	public float speed;

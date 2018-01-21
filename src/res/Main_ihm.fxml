@@ -16,7 +16,7 @@
 		<HBox id="toolbar">
 			<Button styleClass="actionButton" onAction="#loadTrack">
 				<graphic>
-					<ImageView fitWidth="64" fitHeight="64">
+					<ImageView fitWidth="32" fitHeight="32">
 						<image>
 							<Image url="@img/Add_track.png" />
 						</image>
@@ -25,7 +25,7 @@
 			</Button>
 			<Button styleClass="actionButton" onAction="#openAddress">
 				<graphic>
-					<ImageView fitWidth="64" fitHeight="64">
+					<ImageView fitWidth="32" fitHeight="32">
 						<image>
 							<Image url="@img/Open_Address.png" />
 						</image>
@@ -34,7 +34,7 @@
 			</Button>
 			<Button styleClass="actionButton" onAction="#openParameters">
 				<graphic>
-					<ImageView fitWidth="64" fitHeight="64">
+					<ImageView fitWidth="32" fitHeight="32">
 						<image>
 							<Image url="@img/Parameters.png" />
 						</image>

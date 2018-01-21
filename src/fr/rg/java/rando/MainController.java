@@ -24,21 +24,18 @@ import javafx.fxml.FXMLLoader;
 import javafx.geometry.Rectangle2D;
 import javafx.geometry.Side;
 import javafx.scene.Parent;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.CustomMenuItem;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
-import javafx.scene.control.ButtonBar.ButtonData;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
-import javafx.util.Pair;
 
 public class MainController {
 	@FXML
@@ -60,7 +57,7 @@ public class MainController {
 	void initialize() {
 		// Ajouter l'IHM pour la carte
 		try {
-			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Map_ihm.fxml"));
+			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/IGNMap_ihm.fxml"));
 			mainContent.getChildren().add(loader.load());
 			mapController = (IGNMapController) loader.getController();
 		} catch (IOException e) {
@@ -69,7 +66,7 @@ public class MainController {
 
 		// Ajouter l'IHM pour les statistiques
 		try {
-			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/Info_ihm.fxml"));
+			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/InfoGraph_ihm.fxml"));
 			mainContent.getChildren().add(loader.load());
 			infoController = (InfoGraphController) loader.getController();
 		} catch (IOException e) {
@@ -89,8 +86,10 @@ public class MainController {
 		double prefHeight = 13 * screenBounds.getHeight() / 15;
 		mapController.setPrefWidth(prefWidth);
 		infoController.setPrefWidth(prefWidth);
-		mapController.setPrefHeight(0.7 * prefHeight);
-		infoController.setPrefHeight(0.2 * prefHeight);
+
+		// Proportions de chaque zone dans la fenêtre
+		mapController.setPrefHeight(0.65 * prefHeight);
+		infoController.setPrefHeight(0.25 * prefHeight);
 
 		// Géolocalisation initiale pour centrer la carte
 		Preferences prefs = Preferences.userNodeForPackage(Main.class);
