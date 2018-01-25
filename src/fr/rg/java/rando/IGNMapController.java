@@ -23,6 +23,7 @@ import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.fxml.FXML;
+import javafx.geometry.Bounds;
 import javafx.geometry.Point2D;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.control.ProgressBar;
@@ -57,6 +58,9 @@ public class IGNMapController {
 
 	@FXML
 	private Polyline trace;
+
+	@FXML
+	private ImageView currentLocIV;
 
 	@FXML
 	private ToggleButton wmtsGridBtn;
@@ -115,6 +119,9 @@ public class IGNMapController {
 		// Nouvelle image modifiable
 		WritableImage mapImg = new WritableImage(TILE_PIXEL_DIM * numTileX, TILE_PIXEL_DIM * numTileY);
 		mapView.setImage(mapImg);
+
+		// Position actuelle
+		currentLocIV.setVisible(false);
 	}
 
 	/**
@@ -161,6 +168,19 @@ public class IGNMapController {
 			p = WMTS.getWmtsDim(loc.latitude, loc.longitude).subtract(mapWmtsOrig).multiply(dist2px);
 			trace.getPoints().addAll(p.getX(), p.getY());
 		}
+	}
+
+	public void highlightLocation(GeoLocation loc) {
+		if (loc == null) {
+			currentLocIV.setVisible(false);
+			return;
+		}
+		currentLocIV.setVisible(true);
+		double dist2px = TILE_PIXEL_DIM / WMTS.getTileDim(ignScale);
+		Point2D p = WMTS.getWmtsDim(loc.latitude, loc.longitude).subtract(mapWmtsOrig).multiply(dist2px);
+		Bounds bd = currentLocIV.getLayoutBounds();
+		currentLocIV.setX(p.getX() - bd.getWidth() / 2);
+		currentLocIV.setY(p.getY() - bd.getHeight());
 	}
 
 	/**

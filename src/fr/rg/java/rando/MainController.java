@@ -69,6 +69,7 @@ public class MainController {
 			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/InfoGraph_ihm.fxml"));
 			mainContent.getChildren().add(loader.load());
 			infoController = (InfoGraphController) loader.getController();
+			infoController.setMainController(this);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -96,6 +97,16 @@ public class MainController {
 		GeoLocation centerLoc = new GeoLocation(prefs.getDouble(Main.SAVED_LONGITUDE_KEY, Main.DEFAULT_LONGITUDE),
 				prefs.getDouble(Main.SAVED_LATITUDE_KEY, Main.DEFAULT_LATITUDE));
 		mapController.initMap(centerLoc);
+	}
+
+	/**
+	 * Une géolocalisation a été sélectionnée dans le graphe, demander son affichage
+	 * sur la carte.
+	 *
+	 * @param g
+	 */
+	public void onLocationSelectedOnGraph(GeoLocation g) {
+		mapController.highlightLocation(g);
 	}
 
 	/**
@@ -128,11 +139,11 @@ public class MainController {
 
 		// Extraire les géolocalisations du fichier KML
 		HashMap<String, Object> infoKML = new KMLReader().extractLocWithStAXCursor(file.getAbsolutePath());
-		ArrayList<GeoLocation> list = (ArrayList<GeoLocation>) infoKML.get(KMLReader.LOCATIONS_KEY);
+		ArrayList<GeoLocation> geolist = (ArrayList<GeoLocation>) infoKML.get(KMLReader.LOCATIONS_KEY);
 
 		// Ajouter la trace sur la carte et dans le graphe
-		mapController.setTrack(list);
-		infoController.setTrack(list);
+		mapController.setTrack(geolist);
+		infoController.setTrack(geolist);
 
 		// Mettre à jour le titre
 		Stage stage = (Stage) mapController.getWindow();

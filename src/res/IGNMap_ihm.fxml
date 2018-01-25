@@ -11,26 +11,32 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.shape.Polyline?>
 
-<BorderPane xmlns="http://javafx.com/javafx/9" xmlns:fx="http://javafx.com/fxml/1"
-	fx:controller="fr.rg.java.rando.IGNMapController" fx:id="mapContainer"
-	stylesheets="@IGNmap.css">
+<BorderPane fx:id="mapContainer" stylesheets="@IGNmap.css"
+	xmlns="http://javafx.com/javafx/9" xmlns:fx="http://javafx.com/fxml/1"
+	fx:controller="fr.rg.java.rando.IGNMapController">
 	<top>
 		<AnchorPane BorderPane.alignment="CENTER">
 			<children>
-				<ProgressBar fx:id="progressBar" id="progressBar"
+				<ProgressBar id="progressBar" fx:id="progressBar"
 					progress="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" />
 			</children>
 		</AnchorPane>
 	</top>
 	<center>
-		<ScrollPane id="scrollPane" pannable="true"
-			BorderPane.alignment="CENTER" fx:id="mapScrollPane">
+		<ScrollPane id="scrollPane" fx:id="mapScrollPane" pannable="true"
+			BorderPane.alignment="CENTER">
 			<content>
 				<Pane>
 					<children>
 						<ImageView fx:id="mapView" />
 						<Pane fx:id="layerWMTS" />
-						<Polyline fx:id="trace" id="trace" />
+						<Polyline id="trace" fx:id="trace" />
+						<ImageView fx:id="currentLocIV"
+							pickOnBounds="true" preserveRatio="true">
+							<image>
+								<Image url="@img/position.png" />
+							</image>
+						</ImageView>
 					</children>
 				</Pane>
 			</content>
@@ -39,7 +45,7 @@
 	<right>
 		<VBox BorderPane.alignment="CENTER">
 			<children>
-				<ToggleButton mnemonicParsing="false" fx:id="wmtsGridBtn">
+				<ToggleButton fx:id="wmtsGridBtn" mnemonicParsing="false">
 					<graphic>
 						<ImageView fitHeight="16.0" fitWidth="16.0"
 							pickOnBounds="true" preserveRatio="true">

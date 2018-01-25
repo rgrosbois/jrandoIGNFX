@@ -109,6 +109,12 @@ public class InfoGraphController {
 	@FXML
 	private Label timeInfoLbl;
 
+	MainController mainController;
+
+	public void setMainController(MainController m) {
+		mainController = m;
+	}
+
 	/**
 	 * Finaliser l'initialisation des graphes
 	 */
@@ -130,12 +136,13 @@ public class InfoGraphController {
 		elevationChart.setVerticalGridLinesVisible(false);
 		elevationChart.setHorizontalGridLinesVisible(false);
 
-		// Graphe surimposé décalé de la largeur de l'axe Y du graphe 1 - Largeur moins 20 ?
+		// Graphe surimposé décalé de la largeur de l'axe Y du graphe 1 - Largeur moins
+		// 20 ?
 		speedChart.getData().add(speedSerie);
 		speedChart.prefHeightProperty().bind(chartArea.heightProperty());
-		speedChart.minWidthProperty().bind(chartArea.widthProperty().subtract(yAxisWidth+20));
-		speedChart.prefWidthProperty().bind(chartArea.widthProperty().subtract(yAxisWidth+20));
-		speedChart.maxWidthProperty().bind(chartArea.widthProperty().subtract(yAxisWidth+20));
+		speedChart.minWidthProperty().bind(chartArea.widthProperty().subtract(yAxisWidth + 20));
+		speedChart.prefWidthProperty().bind(chartArea.widthProperty().subtract(yAxisWidth + 20));
+		speedChart.maxWidthProperty().bind(chartArea.widthProperty().subtract(yAxisWidth + 20));
 		speedChart.translateXProperty().bind(elevationChart.getYAxis().widthProperty());
 		speedChart.setMouseTransparent(true);
 
@@ -154,6 +161,9 @@ public class InfoGraphController {
 		((BorderPane) chartArea.getParent()).setPrefWidth(height);
 	}
 
+	/**
+	 * Gestion de la souris sur le graphe.
+	 */
 	private void bindMouseEvents() {
 		detailsLayer.prefHeightProperty().bind(chartArea.heightProperty());
 		detailsLayer.prefWidthProperty().bind(chartArea.widthProperty());
@@ -183,6 +193,7 @@ public class InfoGraphController {
 			detailsPopup.setVisible(false);
 			yLine.setVisible(false);
 			detailsLayer.getChildren().removeAll(yLine);
+			mainController.onLocationSelectedOnGraph(null);
 		});
 		chartBackground.setOnMouseMoved(event -> {
 			double x = event.getX() + chartBackground.getLayoutX();
@@ -571,7 +582,8 @@ public class InfoGraphController {
 		distanceInfoLbl.setText(String.format("%.3f km", xValue));
 
 		if (geoLoc != null && geoLoc.size() > 0) {
-			GeoLocation g = findGeoLoc(xValue * 1000);
+			GeoLocation g = findGeoLocNearDist(xValue * 1000);
+			mainController.onLocationSelectedOnGraph(g);
 			if (g != null) {
 				elevationInfoLbl.setVisible(true);
 				speedInfoLbl.setVisible(true);
@@ -591,7 +603,13 @@ public class InfoGraphController {
 
 	}
 
-	public GeoLocation findGeoLoc(double dist) {
+	/**
+	 * Identifier la géolocalisation la plus proche d'une certaine distance.
+	 *
+	 * @param dist
+	 * @return
+	 */
+	public GeoLocation findGeoLocNearDist(double dist) {
 		GeoLocation lastLoc = null;
 		for (GeoLocation g : geoLoc) {
 			if (g.length > dist) {
