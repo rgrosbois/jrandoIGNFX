@@ -31,6 +31,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.image.ImageView;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
@@ -42,10 +43,16 @@ public class MainController {
 	private VBox mainContent;
 
 	// Contrôleur de l'affichage de statistiques
-	InfoGraphController infoController;
+	private InfoGraphController infoController;
 
 	// Contrôleur de l'affichage de carte
-	IGNMapController mapController;
+	private IGNMapController mapController;
+
+	// Noeud racine pour l'affichage de la carte
+	private BorderPane mapRoot;
+
+	// Noeud racine pour l'affichage du graphe
+	private BorderPane graphRoot;
 
 	/**
 	 * Finalise l'initialisation de l'IHM en ajoutant les zones pour la carte et les
@@ -58,21 +65,23 @@ public class MainController {
 		// Ajouter l'IHM pour la carte
 		try {
 			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/IGNMap_ihm.fxml"));
-			mainContent.getChildren().add(loader.load());
+			mapRoot = (BorderPane) loader.load();
 			mapController = (IGNMapController) loader.getController();
+			mapController.setMainController(this);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 
-		// Ajouter l'IHM pour les statistiques
+		// Charger l'IHM pour les statistiques
 		try {
 			FXMLLoader loader = new FXMLLoader(getClass().getResource("/res/InfoGraph_ihm.fxml"));
-			mainContent.getChildren().add(loader.load());
+			graphRoot = (BorderPane) loader.load();
 			infoController = (InfoGraphController) loader.getController();
 			infoController.setMainController(this);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		mainContent.getChildren().addAll(mapRoot, graphRoot);
 
 		// Dimensions du graph et de la carte déduites de celle de l'écran
 		Point p = MouseInfo.getPointerInfo().getLocation();
@@ -84,19 +93,31 @@ public class MainController {
 		// La fenêtre a des dimensions égales à 13/15 de l'écran courant
 		Rectangle2D screenBounds = currentScreen.getBounds();
 		double prefWidth = 13 * screenBounds.getWidth() / 15;
-		double prefHeight = 13 * screenBounds.getHeight() / 15;
-		mapController.setPrefWidth(prefWidth);
-		infoController.setPrefWidth(prefWidth);
+		mainContent.setPrefWidth(prefWidth);
 
 		// Proportions de chaque zone dans la fenêtre
-		mapController.setPrefHeight(0.65 * prefHeight);
-		infoController.setPrefHeight(0.25 * prefHeight);
+		double prefHeight = 13 * screenBounds.getHeight() / 15 - 100;
+		mainContent.setPrefHeight(prefHeight);
+		mapRoot.setPrefHeight(prefHeight);
 
 		// Géolocalisation initiale pour centrer la carte
 		Preferences prefs = Preferences.userNodeForPackage(Main.class);
 		GeoLocation centerLoc = new GeoLocation(prefs.getDouble(Main.SAVED_LONGITUDE_KEY, Main.DEFAULT_LONGITUDE),
 				prefs.getDouble(Main.SAVED_LATITUDE_KEY, Main.DEFAULT_LATITUDE));
 		mapController.initMap(centerLoc);
+	}
+
+	public void toggleHideGraph() {
+		if (graphRoot.isVisible()) {
+			mainContent.getChildren().clear();
+			mainContent.getChildren().add(mapRoot);
+			mapRoot.setPrefHeight(mainContent.getHeight());
+			graphRoot.setVisible(false);
+		} else {
+			mainContent.getChildren().clear();
+			mainContent.getChildren().addAll(mapRoot, graphRoot);
+			graphRoot.setVisible(true);
+		}
 	}
 
 	/**
@@ -125,7 +146,7 @@ public class MainController {
 		Preferences prefs = Preferences.userNodeForPackage(Main.class);
 		chooser.setInitialDirectory(new File(prefs.get(Main.KML_DIR_KEY, "/tmp")));
 
-		File file = chooser.showOpenDialog(mapController.getWindow());
+		File file = chooser.showOpenDialog(mapRoot.getScene().getWindow());
 		if (file == null || !file.exists())
 			return;
 
@@ -146,7 +167,7 @@ public class MainController {
 		infoController.setTrack(geolist);
 
 		// Mettre à jour le titre
-		Stage stage = (Stage) mapController.getWindow();
+		Stage stage = (Stage) mapRoot.getScene().getWindow();
 		stage.setTitle(Main.APP_TITLE + " - " + file.getName());
 	}
 
@@ -175,7 +196,7 @@ public class MainController {
 		dialog.setHeaderText("Rechercher une adresse");
 		dialog.setContentText("adresse:");
 		dialog.initModality(Modality.WINDOW_MODAL);
-		dialog.initOwner(mapController.getWindow());
+		dialog.initOwner(mapRoot.getScene().getWindow());
 
 		// Autocomplétion
 		TextField tf = dialog.getEditor();
@@ -243,7 +264,7 @@ public class MainController {
 			});
 			as.start();
 			// Mettre à jour le titre
-			Stage stage = (Stage) mapController.getWindow();
+			Stage stage = (Stage) mapRoot.getScene().getWindow();
 			stage.setTitle(Main.APP_TITLE + " - " + address);
 		});
 	}

@@ -22,6 +22,7 @@ import fr.rg.java.rando.util.WMTS;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 import javafx.embed.swing.SwingFXUtils;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.geometry.Bounds;
 import javafx.geometry.Point2D;
@@ -36,7 +37,6 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.image.WritablePixelFormat;
-import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Line;
@@ -44,7 +44,6 @@ import javafx.scene.shape.Polyline;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Screen;
-import javafx.stage.Window;
 
 public class IGNMapController {
 	@FXML
@@ -63,13 +62,7 @@ public class IGNMapController {
 	private ImageView currentLocIV;
 
 	@FXML
-	private ToggleButton wmtsGridBtn;
-
-	@FXML
 	private ScrollPane mapScrollPane;
-
-	@FXML
-	private BorderPane mapContainer;
 
 	int numTileX;
 	int numTileY;
@@ -82,24 +75,14 @@ public class IGNMapController {
 	Point2D mapWmtsOrig; // Coordonnées WMTS de l'origine
 	TileLoadingService tls = null;
 
-	public void setPrefHeight(double height) {
-		mapContainer.setPrefHeight(height);
-	}
+	private MainController mainController;
 
-	public void setPrefWidth(double width) {
-		mapContainer.setPrefWidth(width);
-	}
-
-	public Window getWindow() {
-		return mapContainer.getScene().getWindow();
+	public void setMainController(MainController m) {
+		mainController = m;
 	}
 
 	@FXML
 	void initialize() {
-		wmtsGridBtn.setOnAction((e) -> {
-			toggleWMTSLayer();
-		});
-
 		// Nombre impair de tuiles suivant les lignes et les colonnes
 		// et permettant de couvrir ~4 fois l'ecran
 		Point p = MouseInfo.getPointerInfo().getLocation();
@@ -145,9 +128,6 @@ public class IGNMapController {
 		progressBar.progressProperty().bind(tls.progressProperty());
 		tls.start();
 
-		// Ajouter un calque avec le quadrillage WMTS
-		toggleWMTSLayer();
-
 		// Recentrer la carte sur la géolocalisation
 		centerMapToLoc(centerLoc.longitude, centerLoc.latitude);
 	}
@@ -170,6 +150,11 @@ public class IGNMapController {
 		}
 	}
 
+	/**
+	 * Pointer une géolocalisation sur la carte.
+	 *
+	 * @param loc
+	 */
 	public void highlightLocation(GeoLocation loc) {
 		if (loc == null) {
 			currentLocIV.setVisible(false);
@@ -183,11 +168,18 @@ public class IGNMapController {
 		currentLocIV.setY(p.getY() - bd.getHeight());
 	}
 
+	@FXML
+	public void toggleGraphVisibility(ActionEvent e) {
+		mainController.toggleHideGraph();
+	}
+
 	/**
 	 * Ajouter un calque qui affiche les limites des tuiles WMTS ainsi que les
 	 * longitudes et latitudes associées.
 	 */
-	void toggleWMTSLayer() {
+	@FXML
+	public void toggleWMTSLayer(ActionEvent e) {
+		ToggleButton wmtsGridBtn = (ToggleButton) e.getSource();
 		if (wmtsGridBtn.isSelected()) {
 			Color color = Color.CRIMSON;
 			Font f = new Font(14);
@@ -365,6 +357,7 @@ public class IGNMapController {
 							}
 
 							cacheFile = new File(localTileCacheDir, key + ".jpg");
+							System.out.println(cacheFile);
 							if (useCache && cacheFile.exists()) { // utiliser cache
 								img = new Image("file:" + cacheFile.getAbsolutePath());
 							} else {

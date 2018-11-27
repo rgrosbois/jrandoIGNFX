@@ -15,31 +15,31 @@ public class GeoLocation {
 	public static final float NO_ELEVATION = -1;
 
 	private static final DateFormat df = new SimpleDateFormat("dd/MM/yyyy à HH:mm:ss", Locale.FRANCE);
-	// latitude du lieu
+	/** latitude du lieu */
 	public double latitude;
-	// longitude du lieu
+	/** longitude du lieu */
 	public double longitude;
-	// adresse du lieu (si disponible)
+	/** adresse du lieu (si disponible) */
 	public String address;
-	// Zone de géolocalisation contenant le lieu
+	/** Zone de géolocalisation contenant le lieu */
 	public BoundingBox bb;
-	// Altitude issue du fichier KML (i.e. capteur)
+	/** Altitude issue du fichier KML (i.e. capteur) */
 	public float kmlElevation;
-	// Altitude corrigée par un modèle de terrain (IGN)
+	/** Altitude corrigée par un modèle de terrain (IGN) */
 	public float modelElevation = NO_ELEVATION;
-	// Altitude à afficher dans la fenêtre d'information de trace
+	/** Altitude à afficher dans la fenêtre d'information de trace */
 	public float dispElevation;
-	// TimeStamp en secondes
+	/** TimeStamp en secondes */
 	public long timeStampS;
-	// Distance parcourue en mètres
+	/** Distance parcourue en mètres */
 	public int length;
-	// Vitesse instantanée
+	/** Vitesse instantanée */
 	public float speed;
-	// Position modifiée?
+	/** Position modifiée? (lors de l'édition de la trace) */
 	public boolean isModified = false;
-	// Latitude modifiée
+	/** Latitude modifiée (lors de l'édition de la trace) */
 	public double modifiedLatitude;
-	// Longitude modifiée
+	/** Longitude modifiée (lors de l'édition de la trace) */
 	public double modifiedLongitude;
 
 	public GeoLocation() {

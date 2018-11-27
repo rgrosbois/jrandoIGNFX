@@ -29,7 +29,6 @@ import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Line;
@@ -109,7 +108,7 @@ public class InfoGraphController {
 	@FXML
 	private Label timeInfoLbl;
 
-	MainController mainController;
+	private MainController mainController;
 
 	public void setMainController(MainController m) {
 		mainController = m;
@@ -150,15 +149,7 @@ public class InfoGraphController {
 		bindMouseEvents();
 		elevationInfoLbl.managedProperty().bind(elevationInfoLbl.visibleProperty());
 		speedInfoLbl.managedProperty().bind(speedInfoLbl.visibleProperty());
-		timeInfoLbl.managedProperty().bind(timeInfoLbl.visibleProperty());
-	}
-
-	public void setPrefWidth(double width) {
-		((BorderPane) chartArea.getParent()).setPrefWidth(width);
-	}
-
-	public void setPrefHeight(double height) {
-		((BorderPane) chartArea.getParent()).setPrefWidth(height);
+		distanceInfoLbl.managedProperty().bind(distanceInfoLbl.visibleProperty());
 	}
 
 	/**
@@ -199,6 +190,7 @@ public class InfoGraphController {
 			double x = event.getX() + chartBackground.getLayoutX();
 			double y = event.getY() + chartBackground.getLayoutY();
 
+			// Placer la ligne verticale
 			yLine.setStartX(x + 5);
 			yLine.setEndX(x + 5);
 			yLine.setStartY(10);
@@ -286,11 +278,11 @@ public class InfoGraphController {
 	private static String time2String(long duree, boolean showSeconds) {
 		String s = "";
 
-		if (duree > 3600) { // Quantité d'heures
+		if (duree >= 3600) { // Quantité d'heures
 			s += String.format(Locale.getDefault(), "%dh", duree / 60 / 60);
 		}
 
-		if (duree % 3600 > 60) { // Quantité de minutes
+		if (duree % 3600 >= 60) { // Quantité de minutes
 			s += String.format(Locale.getDefault(), "%dmn", (duree % 3600) / 60);
 		}
 
@@ -314,7 +306,7 @@ public class InfoGraphController {
 		progressBar.progressProperty().bind(els.progressProperty());
 		els.start();
 
-		resetFromElevationSource(null);
+		parseFromElevationSource(null);
 	}
 
 	/**
@@ -324,7 +316,7 @@ public class InfoGraphController {
 	 * @param e
 	 */
 	@FXML
-	private void resetFromElevationSource(ActionEvent e) {
+	private void parseFromElevationSource(ActionEvent e) {
 		// Identification de la source
 		boolean elevFromGPS = gpsElevBtn.isSelected();
 
@@ -349,6 +341,7 @@ public class InfoGraphController {
 		long dureePause = 0; // Durée de la pause
 		float deltaElev;
 		float cumulDist = 0;
+		long duree = 0;
 		XYChart.Data<Number, Number> dataElevation = null;
 		XYChart.Data<Number, Number> dataSpeed = null;
 		for (GeoLocation loc : geoLoc) {
@@ -373,19 +366,22 @@ public class InfoGraphController {
 			}
 
 			if (lastLoc != null) {
-				// Lisser l'altitude si données GPS
+				// Durée depuis le départ (en s)
+				duree = loc.timeStampS - geoLoc.get(0).timeStampS;
+				// Lisser l'altitude si les données sont issues du GPS
 				deltaElev = loc.dispElevation - lastLoc.dispElevation;
 				if (elevFromGPS && ((Math.abs(deltaElev) < MIN_DELTA_ALT) || (Math.abs(deltaElev) > MAX_DELTA_ALT))) {
 					loc.dispElevation = lastLoc.dispElevation;
 					deltaElev = 0;
 				}
-				// Dénivelés
 				if (deltaElev > 0) {
 					denivPos += deltaElev;
 				} else {
 					denivNeg += -deltaElev;
 				}
-				// Détection des pauses
+				//////////////////////////
+				// Détection des pauses //
+				//////////////////////////
 				if (loc.speed < SEUIL_VITESSE) { // Pas de mouvement
 					if (!pauseDetectee) { // Début de pause
 						// sauvegarder l'instant de départ
@@ -394,10 +390,12 @@ public class InfoGraphController {
 					}
 				} else { // Mouvement détecté
 					if (pauseDetectee) { // Fin de pause
-						// Calcul durée
+						// Calcul de la durée de la pause
 						dureePause += (loc.timeStampS - debutPause);
 						pauseDetectee = false;
 					}
+					// Moyenner la vitesse sur 2 acquisitions
+					loc.speed = (loc.speed + lastLoc.speed) / 2;
 				}
 				// Distance cumulative
 				cumulDist += loc.distance(lastLoc);
@@ -407,19 +405,16 @@ public class InfoGraphController {
 			}
 
 			// Compléter les courbes
-			dataElevation = new XYChart.Data<>(loc.length / 1000., loc.dispElevation);
+			dataElevation = new XYChart.Data<>(duree, loc.dispElevation);
 			elevationSerie.getData().add(dataElevation);
-			dataSpeed = new XYChart.Data<>(loc.length / 1000., loc.speed);
+			dataSpeed = new XYChart.Data<>(duree, loc.speed);
 			speedSerie.getData().add(dataSpeed);
 
 			// Se souvenir de cette géolocalisation à la prochaine itération.
 			lastLoc = loc;
 		}
 
-		System.out.println(dataElevation);
-		System.out.println(dataSpeed);
-
-		// Adapter les échelles des axes verticaux
+		// Échelle de l'axe vertical d'altitude
 		NumberAxis elevationYAxis = (NumberAxis) elevationChart.getYAxis();
 		elevationYAxis.setAutoRanging(false);
 		int min = ((int) altMin / 100) * 100;
@@ -428,6 +423,7 @@ public class InfoGraphController {
 		elevationYAxis.setUpperBound(max);
 		elevationYAxis.setTickUnit((max - min) / 10);
 
+		// Échelle de l'axe horizontal de vitesse
 		NumberAxis speedYAxis = (NumberAxis) speedChart.getYAxis();
 		speedYAxis.setAutoRanging(false);
 		min = 0;
@@ -435,6 +431,24 @@ public class InfoGraphController {
 		max = ((int) (speedMax + 9) / 10) * 10;
 		speedYAxis.setUpperBound(max);
 		speedYAxis.setTickUnit((max - min) / 10);
+
+		// Axes horizontaux de temps
+		NumberAxis xAxisSpeed = (NumberAxis) speedChart.getXAxis();
+		double minTime = 0;
+		double maxTime = duree;
+		xAxisSpeed.setAutoRanging(false);
+		xAxisSpeed.setTickUnit(15 * 60); // 15mn
+		xAxisSpeed.setMinorTickCount(3);
+		xAxisSpeed.setLowerBound(minTime);
+		xAxisSpeed.setUpperBound(maxTime);
+		xAxisSpeed.setTickLabelFormatter(new TimeConverter(xAxisSpeed));
+		NumberAxis xAxisElevation = (NumberAxis) elevationChart.getXAxis();
+		xAxisElevation.setAutoRanging(false);
+		xAxisElevation.setTickUnit(15 * 60); // 15mn
+		xAxisElevation.setMinorTickCount(3);
+		xAxisElevation.setLowerBound(minTime);
+		xAxisElevation.setUpperBound(maxTime);
+		xAxisElevation.setTickLabelFormatter(new TimeConverter(xAxisElevation));
 
 		// Afficher les statistiques du parcours
 		if (lastLoc != null) {
@@ -506,7 +520,7 @@ public class InfoGraphController {
 
 		@Override
 		protected void succeeded() {
-			resetFromElevationSource(null);
+			parseFromElevationSource(null);
 			super.succeeded();
 		}
 
@@ -576,19 +590,26 @@ public class InfoGraphController {
 		}
 	}
 
+	/**
+	 * Afficher les info concernant
+	 *
+	 * @param event
+	 */
 	public void updateChartInfo(MouseEvent event) {
 		// Distance
 		double xValue = (double) elevationChart.getXAxis().getValueForDisplay(event.getX());
-		distanceInfoLbl.setText(String.format("%.3f km", xValue));
+		timeInfoLbl.setText(time2String((long) xValue, true));
 
 		if (geoLoc != null && geoLoc.size() > 0) {
-			GeoLocation g = findGeoLocNearDist(xValue * 1000);
+			// GeoLocation g = findGeoLocNearestDist(xValue * 1000);
+			GeoLocation g = findGeoLocNearestTime((long) xValue);
 			mainController.onLocationSelectedOnGraph(g);
 			if (g != null) {
 				elevationInfoLbl.setVisible(true);
 				speedInfoLbl.setVisible(true);
-				timeInfoLbl.setVisible(true);
+				distanceInfoLbl.setVisible(true);
 
+				distanceInfoLbl.setText(String.format("%.3f km", g.length / 1000.));
 				elevationInfoLbl.setText(String.format("%.0f m", g.dispElevation));
 				speedInfoLbl.setText(String.format("%.2f km/h", g.speed));
 				// Durée
@@ -599,7 +620,7 @@ public class InfoGraphController {
 		}
 		elevationInfoLbl.setVisible(false);
 		speedInfoLbl.setVisible(false);
-		timeInfoLbl.setVisible(false);
+		distanceInfoLbl.setVisible(false);
 
 	}
 
@@ -609,7 +630,7 @@ public class InfoGraphController {
 	 * @param dist
 	 * @return
 	 */
-	public GeoLocation findGeoLocNearDist(double dist) {
+	public GeoLocation findGeoLocNearestDist(double dist) {
 		GeoLocation lastLoc = null;
 		for (GeoLocation g : geoLoc) {
 			if (g.length > dist) {
@@ -627,5 +648,47 @@ public class InfoGraphController {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Identifier la géolocalisation la plus proche d'un certain temps.
+	 *
+	 * @param time
+	 * @return
+	 */
+	public GeoLocation findGeoLocNearestTime(long time) {
+		GeoLocation lastLoc = null;
+		GeoLocation fg = geoLoc.get(0);
+		for (GeoLocation g : geoLoc) {
+			if (g.timeStampS - fg.timeStampS > time) {
+				if (lastLoc == null) {
+					return g;
+				} else {
+					if (Math.abs(g.timeStampS - fg.timeStampS) < Math.abs(lastLoc.timeStampS - fg.timeStampS)) {
+						return g;
+					} else {
+						return lastLoc;
+					}
+				}
+			}
+			lastLoc = g;
+		}
+
+		return null;
+	}
+
+	class TimeConverter extends NumberAxis.DefaultFormatter {
+
+		public TimeConverter(NumberAxis arg0) {
+			super(arg0);
+		}
+
+		@Override
+		public String toString(Number arg0) {
+			long v = arg0.longValue();
+
+			return time2String(v, true);
+		}
+
 	}
 }

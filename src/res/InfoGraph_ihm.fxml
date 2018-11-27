@@ -20,13 +20,13 @@
 				<HBox alignment="CENTER" styleClass="elevationType">
 					<children>
 						<ToggleButton fx:id="gpsElevBtn" mnemonicParsing="false"
-							onAction="#resetFromElevationSource" selected="true" text="GPS">
+							onAction="#parseFromElevationSource" selected="true" text="GPS">
 							<toggleGroup>
 								<ToggleGroup fx:id="elevationTypeGroup" />
 							</toggleGroup>
 						</ToggleButton>
 						<ToggleButton fx:id="modelElevBtn" mnemonicParsing="false"
-							onAction="#resetFromElevationSource" text="Modèle" toggleGroup="$elevationTypeGroup" />
+							onAction="#parseFromElevationSource" text="Modèle" toggleGroup="$elevationTypeGroup" />
 					</children>
 				</HBox>
 				<HBox id="statContainer">
@@ -68,7 +68,7 @@
 							createSymbols="false" legendVisible="false" maxHeight="300.0"
 							minHeight="100.0" prefHeight="200.0">
 							<xAxis>
-								<NumberAxis label="Distance [km]" side="BOTTOM" />
+								<NumberAxis label="Durée" side="BOTTOM" />
 							</xAxis>
 							<yAxis>
 								<NumberAxis label="Vitesse [km/h]" maxWidth="50"
@@ -79,7 +79,7 @@
 							createSymbols="false" legendVisible="false" maxHeight="300.0"
 							minHeight="100.0" prefHeight="200.0">
 							<xAxis>
-								<NumberAxis label="Distance [km]" opacity="0.0" side="BOTTOM" />
+								<NumberAxis label="Durée" opacity="0.0" side="BOTTOM" />
 							</xAxis>
 							<yAxis>
 								<NumberAxis label="Altitude [m]" maxWidth="50" id="elevationChartYAxis"
@@ -89,10 +89,10 @@
 						<AnchorPane fx:id="detailsLayer">
 							<children>
 								<VBox fx:id="detailsPopup" id="detailsPopup" visible="false">
+									<Label fx:id="timeInfoLbl" />
 									<Label fx:id="distanceInfoLbl" />
 									<Label fx:id="elevationInfoLbl" id="elevationInfoLbl" />
 									<Label fx:id="speedInfoLbl" id="speedInfoLbl" />
-									<Label fx:id="timeInfoLbl" />
 								</VBox>
 							</children>
 						</AnchorPane>

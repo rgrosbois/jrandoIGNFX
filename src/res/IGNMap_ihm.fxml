@@ -11,7 +11,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.shape.Polyline?>
 
-<BorderPane fx:id="mapContainer" stylesheets="@IGNmap.css"
+<BorderPane stylesheets="@IGNmap.css"
 	xmlns="http://javafx.com/javafx/9" xmlns:fx="http://javafx.com/fxml/1"
 	fx:controller="fr.rg.java.rando.IGNMapController">
 	<top>
@@ -31,8 +31,8 @@
 						<ImageView fx:id="mapView" />
 						<Pane fx:id="layerWMTS" />
 						<Polyline id="trace" fx:id="trace" />
-						<ImageView fx:id="currentLocIV"
-							pickOnBounds="true" preserveRatio="true">
+						<ImageView fx:id="currentLocIV" pickOnBounds="true"
+							preserveRatio="true">
 							<image>
 								<Image url="@img/position.png" />
 							</image>
@@ -45,12 +45,22 @@
 	<right>
 		<VBox BorderPane.alignment="CENTER">
 			<children>
-				<ToggleButton fx:id="wmtsGridBtn" mnemonicParsing="false">
+				<ToggleButton onAction="#toggleWMTSLayer" mnemonicParsing="false">
 					<graphic>
 						<ImageView fitHeight="16.0" fitWidth="16.0"
 							pickOnBounds="true" preserveRatio="true">
 							<image>
 								<Image url="@img/Grid.png" />
+							</image>
+						</ImageView>
+					</graphic>
+				</ToggleButton>
+				<ToggleButton onAction="#toggleGraphVisibility" mnemonicParsing="false">
+					<graphic>
+						<ImageView fitHeight="16.0" fitWidth="16.0"
+							pickOnBounds="true" preserveRatio="true">
+							<image>
+								<Image url="@img/ShowGraph.png" />
 							</image>
 						</ImageView>
 					</graphic>
